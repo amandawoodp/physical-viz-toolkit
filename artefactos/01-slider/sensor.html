@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sensor slider</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; text-align: center; }
+    #instr { font-size: 22px; margin-top: 30px; }
+    #valor { font-size: 60px; margin-top: 20px; color: #2a7; }
+  </style>
+</head>
+<body>
+  <div id="instr">Apunta la cámara al canal.<br>Pon el cubo en el EXTREMO IZQUIERDO y toca aquí.</div>
+  <div id="valor">—</div>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+  <script src="config.js"></script>
+  <script>
+    const instr = document.getElementById("instr");
+    const valorEl = document.getElementById("valor");
+
+    // ---- 1) INICIAR EL SENSOR ----
+    // Detecta marcadores cada 100 ms con la cámara trasera (id 0).
+    Protobject.Aruco.start(100, 0);
+
+    // ---- 2) ESTADO DE CALIBRACIÓN ----
+    let xMin = null;          // X cuando el cubo está al extremo izquierdo
+    let xMax = null;          // X cuando el cubo está al extremo derecho
+    let etapa = "izq";        // "izq" → "der" → "listo"
+    let ultimaX = null;       // última X detectada del cubo
+    let binAnterior = null;   // última casilla enviada (0-9)
+
+    // ---- 3) LECTURA DE MARCADORES ----
+    // Protobject.Aruco entrega un objeto con TODOS los marcadores visibles:
+    //   { "23": { position:{x,y}, size }, "42": { position:{x,y}, size }, ... }
+    // Tomamos el de MAYOR tamaño: ese es la cara del cubo más cercana
+    // a la cámara. Así el slider funciona con cualquier cara del cubo,
+    // sin tener que saber qué ID está arriba.
+    Protobject.Aruco.onData((data) => {
+      const ids = Object.keys(data);
+      if (ids.length === 0) return;
+
+      let mejorId = ids[0];
+      for (const id of ids) {
+        if (data[id].size > data[mejorId].size) mejorId = id;
+      }
+      ultimaX = data[mejorId].position.x;
+      valorEl.textContent = "x: " + Math.round(ultimaX);
+
+      if (etapa !== "listo") return;
+
+      // Normalizar al rango calibrado [0, 1] y limitar
+      let t = (ultimaX - xMin) / (xMax - xMin);
+      t = Math.max(0, Math.min(1, t));
+
+      // Mapear a 10 casillas discretas (0 a 9)
+      const bin = Math.min(9, Math.floor(t * 10));
+
+      // Enviar SOLO cuando cambia de casilla: ese es el evento semántico.
+      if (bin !== binAnterior) {
+        binAnterior = bin;
+        Protobject.Core.send(bin).to("index.html");
+      }
+    });
+
+    // ---- 4) CALIBRACIÓN POR TOQUE ----
+    // Dos toques en la pantalla del teléfono: izquierda, luego derecha.
+    document.body.addEventListener("click", () => {
+      if (ultimaX === null) {
+        instr.textContent = "Aún no veo el cubo. Apunta bien la cámara.";
+        return;
+      }
+      if (etapa === "izq") {
+        xMin = ultimaX;
+        etapa = "der";
+        instr.textContent = "Ahora ponlo al EXTREMO DERECHO y toca aquí.";
+      } else if (etapa === "der") {
+        xMax = ultimaX;
+        etapa = "listo";
+        instr.textContent = "¡Listo! Desliza el cubo por el canal.";
+      }
+    });
+  </script>
+</body>
+</html>

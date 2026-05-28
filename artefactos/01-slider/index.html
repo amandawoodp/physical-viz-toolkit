@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Slider óptico</title>
+  <style>
+    body {
+      margin: 0; height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      font-family: sans-serif; background: #f4f4f4;
+    }
+    #salida {
+      font-size: 16rem; font-weight: bold; color: #222;
+    }
+    /* El "+" que muestra el QR para conectar el teléfono */
+    #ProtobjectPlusButton { width: 80px !important; }
+    #ProtobjectPlusButton:after { content: " Conectar teléfono"; }
+  </style>
+</head>
+<body>
+
+  <div id="salida">—</div>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+  <script src="config.js"></script>
+  <script>
+    // Recibe el número ya interpretado (0 a 9) desde el teléfono
+    // y lo muestra grande en pantalla. Una entrada → un efecto.
+    Protobject.Core.onReceived((valor) => {
+      document.getElementById("salida").textContent = valor;
+    });
+  </script>
+
+</body>
+</html>
