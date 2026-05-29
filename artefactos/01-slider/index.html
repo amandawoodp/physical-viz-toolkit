@@ -6,18 +6,42 @@
   <style>
     body {
       margin: 0; height: 100vh;
-      display: flex; align-items: center; justify-content: center;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
       font-family: sans-serif; background: #f4f4f4;
+      gap: 40px;
+    }
+    #titulo {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #2a7;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    #subtitulo {
+      font-size: 1.2rem;
+      color: #666;
+      margin-top: -30px;
     }
     #salida {
-      font-size: 16rem; font-weight: bold; color: #222;
+      font-size: 16rem;
+      font-weight: bold;
+      color: #222;
+      line-height: 1;
     }
-    /* Botón "+" que muestra el QR para conectar el teléfono */
+    /* Botón "+" que muestra el QR. Lo movemos a la esquina superior
+       izquierda para que no se corte y le damos espacio para el texto. */
     #ProtobjectPlusButton {
       width: auto !important;
-      padding: 12px 20px !important;
+      height: auto !important;
+      padding: 14px 24px !important;
       font-size: 16px !important;
       white-space: nowrap !important;
+      top: 20px !important;
+      left: 20px !important;
+      right: auto !important;
+      bottom: auto !important;
+      border-radius: 30px !important;
     }
     #ProtobjectPlusButton:after {
       content: " Conectar teléfono";
@@ -26,6 +50,8 @@
 </head>
 <body>
 
+  <div id="titulo">Ejemplo 1 · Slider óptico</div>
+  <div id="subtitulo">Desliza el cubo por el canal de 0 a 9</div>
   <div id="salida">—</div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
