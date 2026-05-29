@@ -20,24 +20,39 @@
     const instr = document.getElementById("instr");
     const valorEl = document.getElementById("valor");
 
-    // ---- 1) INICIAR EL SENSOR ----
-    // Detecta marcadores cada 100 ms con la cámara trasera (id 0).
-    Protobject.Aruco.start(100, 0);
-    Protobject.Aruco.showPreview({ top: 200, left: 10, width: 320, height: 240 });
+    // ---- 0) FORZAR CÁMARA TRASERA EN iPhone ----
+    // En iOS, los índices de cámara no son confiables. La forma
+    // robusta es pedirla explícitamente con facingMode: "environment".
+    // Hacemos esta llamada antes que cualquier cosa para que el
+    // navegador "reserve" la cámara correcta.
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { exact: "environment" } }
+    }).then((stream) => {
+      // Inmediatamente la cerramos: solo queríamos forzar la elección.
+      stream.getTracks().forEach(t => t.stop());
 
-    // ---- 2) ESTADO DE CALIBRACIÓN ----
-    let xMin = null;          // X cuando el cubo está al extremo izquierdo
-    let xMax = null;          // X cuando el cubo está al extremo derecho
-    let etapa = "izq";        // "izq" → "der" → "listo"
-    let ultimaX = null;       // última X detectada del cubo
-    let binAnterior = null;   // última casilla enviada (0-9)
+      // Ahora arrancamos ArUco. Como ya "tocamos" la trasera primero,
+      // el navegador se la entrega cuando Protobject la pida.
+      iniciarSensor();
+    }).catch((err) => {
+      console.warn("No pude forzar trasera, uso default:", err);
+      iniciarSensor();
+    });
 
-    // ---- 3) LECTURA DE MARCADORES ----
-    // Protobject.Aruco entrega un objeto con TODOS los marcadores visibles:
-    //   { "23": { position:{x,y}, size }, "42": { position:{x,y}, size }, ... }
-    // Tomamos el de MAYOR tamaño: ese es la cara del cubo más cercana
-    // a la cámara. Así el slider funciona con cualquier cara del cubo,
-    // sin tener que saber qué ID está arriba.
+    function iniciarSensor() {
+      // Detecta marcadores cada 100 ms
+      Protobject.Aruco.start(100, 0);
+      Protobject.Aruco.showPreview({ top: 200, left: 10, width: 320, height: 240 });
+    }
+
+    // ---- ESTADO DE CALIBRACIÓN ----
+    let xMin = null;
+    let xMax = null;
+    let etapa = "izq";
+    let ultimaX = null;
+    let binAnterior = null;
+
+    // ---- LECTURA DE MARCADORES ----
     Protobject.Aruco.onData((data) => {
       const ids = Object.keys(data);
       if (ids.length === 0) return;
@@ -51,22 +66,18 @@
 
       if (etapa !== "listo") return;
 
-      // Normalizar al rango calibrado [0, 1] y limitar
       let t = (ultimaX - xMin) / (xMax - xMin);
       t = Math.max(0, Math.min(1, t));
 
-      // Mapear a 10 casillas discretas (0 a 9)
       const bin = Math.min(9, Math.floor(t * 10));
 
-      // Enviar SOLO cuando cambia de casilla: ese es el evento semántico.
       if (bin !== binAnterior) {
         binAnterior = bin;
         Protobject.Core.send(bin).to("index.html");
       }
     });
 
-    // ---- 4) CALIBRACIÓN POR TOQUE ----
-    // Dos toques en la pantalla del teléfono: izquierda, luego derecha.
+    // ---- CALIBRACIÓN POR TOQUE ----
     document.body.addEventListener("click", () => {
       if (ultimaX === null) {
         instr.textContent = "Aún no veo el cubo. Apunta bien la cámara.";
