@@ -128,7 +128,7 @@
     let historial = [];
 
     let punto0 = null;
-    let punto4 = null;
+    let punto2 = null;
     let eje = null;
     let etapa = "calibrar0";
 
@@ -291,25 +291,25 @@
 
       if (etapa === "calibrar0") {
         punto0 = { x: ultimaLectura.x, y: ultimaLectura.y };
-        etapa = "calibrar4";
+        etapa = "calibrar2";
 
-        instr.textContent = "Ahora pon el cubo en el extremo 4 y toca calibrar.";
-        btnCalibrar.textContent = "Calibrar extremo 4";
+        instr.textContent = "Ahora pon el cubo en el extremo 2 y toca calibrar.";
+        btnCalibrar.textContent = "Calibrar extremo 2";
         btnCalibrar.classList.add("done");
 
         return;
       }
 
-      if (etapa === "calibrar4") {
-        punto4 = { x: ultimaLectura.x, y: ultimaLectura.y };
+      if (etapa === "calibrar2") {
+        punto2 = { x: ultimaLectura.x, y: ultimaLectura.y };
 
-        const dx = Math.abs(punto4.x - punto0.x);
-        const dy = Math.abs(punto4.y - punto0.y);
+        const dx = Math.abs(punto2.x - punto0.x);
+        const dy = Math.abs(punto2.y - punto0.y);
 
         eje = dx >= dy ? "x" : "y";
 
-        if (Math.max(dx, dy) < 40) {
-          instr.textContent = "Los extremos quedaron muy cerca. Usa un canal más largo o recalibra.";
+        if (Math.max(dx, dy) < 20) {
+          instr.textContent = "Los extremos quedaron muy cerca. Baja un poco el teléfono, alarga el canal o recalibra.";
           return;
         }
 
@@ -329,7 +329,7 @@
 
     function reiniciar() {
       punto0 = null;
-      punto4 = null;
+      punto2 = null;
       eje = null;
       etapa = "calibrar0";
 
@@ -348,19 +348,19 @@
     }
 
     // -----------------------------
-    // Mapeo 0–4 y salida gradual
+    // Mapeo 0–2 y salida gradual
     // -----------------------------
     function actualizarSlider(punto, iniciarSinAnimacion = false) {
       const inicio = punto0[eje];
-      const fin = punto4[eje];
+      const fin = punto2[eje];
       const actual = punto[eje];
 
       let t = (actual - inicio) / (fin - inicio);
       t = Math.max(0, Math.min(1, t));
 
-      // Cinco zonas: 0, 1, 2, 3, 4.
-      let binCrudo = Math.floor(t * 5);
-      binCrudo = Math.max(0, Math.min(4, binCrudo));
+      // Tres zonas: 0, 1, 2.
+      let binCrudo = Math.floor(t * 3);
+      binCrudo = Math.max(0, Math.min(2, binCrudo));
 
       fill.style.width = (t * 100).toFixed(1) + "%";
 
