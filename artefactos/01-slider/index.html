@@ -49,16 +49,27 @@
 <body>
 
   <div id="titulo">Ejemplo 1 · Slider óptico</div>
-  <div id="subtitulo">Desliza el cubo por el canal: izquierda, centro o derecha</div>
+  <div id="subtitulo">Desliza el cubo por el canal de 0 a 4</div>
   <div id="salida">—</div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
     console.log("PC: registrando callback onReceived...");
+
+    let primerMensajeRecibido = false;
+
     Protobject.Core.onReceived((valor) => {
       console.log("PC recibió:", valor);
       document.getElementById("salida").textContent = valor;
+
+      // La primera vez que recibimos algo, actualizamos el subtítulo
+      // para mostrar visualmente que la conexión está activa.
+      if (!primerMensajeRecibido) {
+        primerMensajeRecibido = true;
+        document.getElementById("subtitulo").textContent = "✓ Teléfono conectado · desliza el cubo";
+        document.getElementById("subtitulo").style.color = "#2a7";
+      }
     });
   </script>
 

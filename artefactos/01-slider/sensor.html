@@ -14,14 +14,13 @@
   <div id="instr">Apunta la cámara al canal.<br>Pon el cubo en el EXTREMO IZQUIERDO y toca aquí.</div>
   <div id="valor">—</div>
 
-  <!-- 1) Framework -->
   <script src="https://app.protobject.com/framework/p.js"></script>
 
-  <!-- 2) Lógica del sensor: registramos onReceived (aunque aquí no lo usemos), startup, etc. -->
   <script>
     const instr = document.getElementById("instr");
     const valorEl = document.getElementById("valor");
 
+    // ---- FORZAR CÁMARA TRASERA EN iPhone ----
     async function elegirYIniciar() {
       try {
         const tmp = await navigator.mediaDevices.getUserMedia({
@@ -54,12 +53,16 @@
     }
     elegirYIniciar();
 
+    // ---- ESTADO DE CALIBRACIÓN ----
     let xMin = null;
     let xMax = null;
     let etapa = "izq";
     let ultimaX = null;
     let binAnterior = null;
 
+    // ---- LECTURA DE MARCADORES ----
+    // Tomamos el marcador más grande (la cara más cercana a la cámara).
+    // Así el slider funciona con cualquier cara del cubo.
     Protobject.Aruco.onData((data) => {
       const ids = Object.keys(data);
       if (ids.length === 0) return;
@@ -69,6 +72,7 @@
         if (data[id].size > data[mejorId].size) mejorId = id;
       }
 
+      // Con el teléfono horizontal el canal corre a lo largo del eje Y
       ultimaX = data[mejorId].position.y;
 
       if (etapa !== "listo") {
@@ -76,12 +80,17 @@
         return;
       }
 
+      // Normalizar al rango calibrado [0, 1]
       let t = (ultimaX - xMin) / (xMax - xMin);
       t = Math.max(0, Math.min(1, t));
 
-      const bin = Math.min(2, Math.floor(t * 3));
+      // Mapear a 5 casillas discretas: 0, 1, 2, 3, 4
+      const bin = Math.min(4, Math.floor(t * 5));
+
+      // Mostrar en el teléfono lo que estamos calculando (depuración)
       valorEl.textContent = "bin: " + bin + " (t=" + t.toFixed(2) + ")";
 
+      // Enviar SOLO cuando cambia la casilla: ese es el evento semántico.
       if (bin !== binAnterior) {
         binAnterior = bin;
         Protobject.Core.send(bin).to("index.html");
@@ -89,6 +98,7 @@
       }
     });
 
+    // ---- CALIBRACIÓN POR TOQUE ----
     document.body.addEventListener("click", () => {
       if (ultimaX === null) {
         instr.textContent = "Aún no veo el cubo. Apunta bien la cámara.";
@@ -106,7 +116,6 @@
     });
   </script>
 
-  <!-- 3) ÚLTIMO: arrancar Protobject. Ya está todo registrado arriba. -->
   <script src="config.js"></script>
 </body>
 </html>
