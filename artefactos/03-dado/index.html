@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Dado de decisión</title>
+  <style>
+    body {
+      margin: 0; height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: sans-serif; background: #f4f4f4;
+      gap: 40px;
+      transition: background 0.4s;
+    }
+    #titulo {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #2a7;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    #subtitulo {
+      font-size: 1.2rem;
+      color: #666;
+      margin-top: -30px;
+    }
+    #salida {
+      font-size: 22rem;
+      font-weight: bold;
+      color: #222;
+      line-height: 1;
+      transition: color 0.3s, transform 0.3s;
+    }
+    #ProtobjectPlusButton {
+      width: auto !important;
+      height: auto !important;
+      padding: 14px 24px !important;
+      font-size: 16px !important;
+      white-space: nowrap !important;
+      top: 20px !important;
+      left: 20px !important;
+      right: auto !important;
+      bottom: auto !important;
+      border-radius: 30px !important;
+    }
+    #ProtobjectPlusButton:after {
+      content: " Conectar teléfono";
+    }
+  </style>
+</head>
+<body>
+
+  <div id="titulo">Ejemplo 3 · Dado de decisión</div>
+  <div id="subtitulo">Lanza el cubo bajo la cámara</div>
+  <div id="salida">—</div>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    console.log("PC: registrando callback onReceived...");
+
+    // Colores asociados a cada cara, para que al cambiar de número
+    // la pantalla cambie también de color y se sienta "viva".
+    const coloresPorCara = {
+      1: "#e63946",
+      2: "#f4a261",
+      3: "#e9c46a",
+      4: "#2a9d8f",
+      5: "#264653",
+      6: "#9d4edd"
+    };
+
+    let primerMensaje = false;
+
+    Protobject.Core.onReceived((cara) => {
+      console.log("PC recibió cara:", cara);
+
+      const salida = document.getElementById("salida");
+      salida.textContent = cara;
+      salida.style.color = coloresPorCara[cara] || "#222";
+
+      // Pequeño "pop" al cambiar de cara
+      salida.style.transform = "scale(1.15)";
+      setTimeout(() => { salida.style.transform = "scale(1)"; }, 200);
+
+      if (!primerMensaje) {
+        primerMensaje = true;
+        document.getElementById("subtitulo").textContent = "✓ Teléfono conectado · lanza el cubo";
+        document.getElementById("subtitulo").style.color = "#2a7";
+      }
+    });
+  </script>
+
+  <script src="config.js"></script>
+
+</body>
+</html>

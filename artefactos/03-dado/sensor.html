@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sensor dado</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; text-align: center; }
+    #instr { font-size: 22px; margin-top: 30px; }
+    #valor { font-size: 60px; margin-top: 20px; color: #2a7; }
+  </style>
+</head>
+<body>
+  <div id="instr">Lanza el cubo bajo la cámara.</div>
+  <div id="valor">—</div>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    const instr = document.getElementById("instr");
+    const valorEl = document.getElementById("valor");
+
+    // ---- FORZAR CÁMARA TRASERA EN iPhone ----
+    // (Misma estrategia que en el slider: enumerar cámaras y elegir
+    //  la que tenga "back", "rear", "posterior" o "trasera" en el nombre.)
+    async function elegirYIniciar() {
+      try {
+        const tmp = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        tmp.getTracks().forEach(t => t.stop());
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const camaras = devices.filter(d => d.kind === "videoinput");
+
+        let idxTrasera = 0;
+        for (let i = 0; i < camaras.length; i++) {
+          const nombre = camaras[i].label.toLowerCase();
+          if (nombre.includes("back") || nombre.includes("posterior") ||
+              nombre.includes("rear") || nombre.includes("trasera")) {
+            idxTrasera = i;
+            break;
+          }
+        }
+        console.log("Usando cámara índice:", idxTrasera, camaras[idxTrasera]?.label);
+
+        Protobject.Aruco.start(150, idxTrasera);
+      } catch (err) {
+        console.warn("Falló elección de cámara, uso 0 por defecto:", err);
+        Protobject.Aruco.start(150, 0);
+      }
+
+      // Preview activado para que durante el setup el usuario vea qué
+      // está leyendo la cámara. Se puede comentar para grabar el video.
+      Protobject.Aruco.showPreview({ top: 200, left: 10, width: 320, height: 240 });
+    }
+    elegirYIniciar();
+
+    // ---- MAPEO ID DE MARCADOR → NÚMERO DE CARA ----
+    // Cada cara del Cubo ArUco lleva un marcador distinto del
+    // diccionario "Original ArUco". Acá decimos qué ID corresponde
+    // a qué número de cara (1 a 6).
+    //
+    // Si tu cubo usa otros IDs, ajusta este objeto. Para descubrir
+    // qué ID hay en cada cara, mira la consola del teléfono al
+    // poner cada cara hacia arriba.
+    const carasPorId = {
+      0: 1,
+      1: 2,
+      2: 3,
+      3: 4,
+      4: 5,
+      5: 6
+    };
+
+    // ---- ESTADO ----
+    let caraAnterior = null;     // última cara enviada al PC
+    let candidata = null;        // cara que estamos viendo ahora mismo
+    let candidataDesde = null;   // cuándo empezamos a verla
+    const ESTABLE_MS = 400;      // tiempo mínimo para confirmar la cara
+
+    // ---- LECTURA DE MARCADORES ----
+    // Protobject.Aruco entrega un objeto con TODOS los marcadores visibles:
+    //   { "23": { position:{x,y}, size }, "42": { position:{x,y}, size }, ... }
+    // Tomamos el de MAYOR tamaño: ese es la cara superior del cubo,
+    // la que mira a la cámara cenital.
+    //
+    // Un cubo rodando hace que la cámara vea brevemente varias caras.
+    // Para evitar parpadeo, solo confirmamos una cara cuando es la
+    // candidata más estable durante ESTABLE_MS milisegundos. Esto
+    // implementa la "histéresis temporal" que la guía pide para
+    // exponer eventos semánticos, no datos crudos.
+    Protobject.Aruco.onData((data) => {
+      const ids = Object.keys(data);
+
+      if (ids.length === 0) {
+        // No vemos ninguna cara: reset de la candidata
+        candidata = null;
+        candidataDesde = null;
+        return;
+      }
+
+      // Elegir el marcador más grande (cara superior del dado)
+      let mejorId = ids[0];
+      for (const id of ids) {
+        if (data[id].size > data[mejorId].size) mejorId = id;
+      }
+
+      const cara = carasPorId[mejorId];
+      if (cara === undefined) {
+        // ID desconocido: ignorar. Útil cuando hay otros marcadores
+        // ArUco en la escena que no son del dado.
+        valorEl.textContent = "ID " + mejorId + " desconocido";
+        return;
+      }
+
+      const ahora = Date.now();
+
+      // Si cambiamos de candidata, reiniciar el reloj de estabilidad
+      if (cara !== candidata) {
+        candidata = cara;
+        candidataDesde = ahora;
+        return;
+      }
+
+      // ¿Llevamos suficiente tiempo viendo la misma cara?
+      if (ahora - candidataDesde < ESTABLE_MS) return;
+
+      // Cara estable confirmada: enviar al PC sólo si cambió
+      if (cara !== caraAnterior) {
+        caraAnterior = cara;
+        valorEl.textContent = "Cara: " + cara;
+        Protobject.Core.send(cara).to("index.html");
+        console.log("Enviado al PC: cara =", cara);
+      }
+    });
+  </script>
+
+  <script src="config.js"></script>
+</body>
+</html>
