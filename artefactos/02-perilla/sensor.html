@@ -3,120 +3,189 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Sensor perilla</title>
+  <title>Sensor perilla (debug)</title>
   <style>
     * { box-sizing: border-box; }
     body {
-      font-family: sans-serif; padding: 20px; text-align: center;
-      background: #fafafa; margin: 0;
+      font-family: monospace; padding: 15px; margin: 0;
+      background: #fafafa; font-size: 16px;
     }
-    #instr {
-      font-size: 22px; margin-top: 20px;
+    h2 { margin-top: 10px; font-size: 18px; }
+    .box {
+      background: white; border: 2px solid #ddd; border-radius: 8px;
+      padding: 12px; margin: 10px 0;
     }
-    #valor {
-      font-size: 50px; margin-top: 20px; color: #2a7; font-weight: bold;
-    }
-    /* Botón GIGANTE y arriba para que sea imposible no tocarlo */
+    .box.ok { border-color: #2a7; background: #eef9f3; }
+    .box.err { border-color: #c44; background: #fdeeee; }
     #calibrar {
-      display: block;
-      width: 90%;
-      max-width: 400px;
-      margin: 30px auto;
-      padding: 30px 20px;
-      font-size: 24px;
-      font-weight: bold;
-      background: #2a7;
-      color: white;
-      border: none;
-      border-radius: 20px;
-      cursor: pointer;
-      -webkit-tap-highlight-color: rgba(0,0,0,0.2);
+      display: block; width: 100%; padding: 25px;
+      font-size: 22px; font-weight: bold;
+      background: #2a7; color: white; border: none; border-radius: 14px;
+      margin: 15px 0;
       touch-action: manipulation;
     }
-    #calibrar:active {
-      background: #1a5;
-      transform: scale(0.98);
+    #calibrar:active { background: #1a5; }
+    #permiso {
+      display: block; width: 100%; padding: 18px;
+      font-size: 18px; font-weight: bold;
+      background: #e63946; color: white; border: none; border-radius: 14px;
+      margin: 15px 0;
     }
+    .pequeno { font-size: 13px; color: #666; }
   </style>
 </head>
 <body>
-  <div id="instr">Pon el teléfono plano sobre la mesa, en su posición inicial.</div>
+
+  <h2>🔍 Diagnóstico de la perilla</h2>
+
+  <button id="permiso">PEDIR PERMISO DE ORIENTACIÓN (iOS)</button>
+
+  <div class="box" id="boxPermiso">
+    <strong>Permiso iOS:</strong> <span id="estadoPermiso">no solicitado</span>
+  </div>
+
+  <div class="box" id="boxLectura">
+    <strong>Lecturas del sensor:</strong> <span id="contadorLecturas">0</span><br>
+    <span class="pequeno">horizontalContinuous:</span> <span id="hcont">—</span><br>
+    <span class="pequeno">horizontal:</span> <span id="h">—</span>
+  </div>
 
   <button id="calibrar">📍 CALIBRAR COMO POSICIÓN 0</button>
 
-  <div id="valor">—</div>
+  <div class="box" id="boxCalib">
+    <strong>Estado:</strong> <span id="estadoCalib">sin calibrar</span><br>
+    <span class="pequeno">Origen:</span> <span id="origen">—</span><br>
+    <span class="pequeno">Ángulo relativo:</span> <span id="rel">—</span>
+  </div>
+
+  <div class="box" id="boxEnvio">
+    <strong>Envíos al PC:</strong> <span id="contadorEnvios">0</span><br>
+    <span class="pequeno">Último enviado:</span> <span id="ultimoEnvio">—</span>
+  </div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
-    const instr = document.getElementById("instr");
-    const valorEl = document.getElementById("valor");
+    // Referencias a los elementos de la UI
+    const estadoPermiso = document.getElementById("estadoPermiso");
+    const boxPermiso = document.getElementById("boxPermiso");
+    const contadorLecturas = document.getElementById("contadorLecturas");
+    const hcontEl = document.getElementById("hcont");
+    const hEl = document.getElementById("h");
+    const boxLectura = document.getElementById("boxLectura");
+    const estadoCalib = document.getElementById("estadoCalib");
+    const origenEl = document.getElementById("origen");
+    const relEl = document.getElementById("rel");
+    const boxCalib = document.getElementById("boxCalib");
+    const contadorEnvios = document.getElementById("contadorEnvios");
+    const ultimoEnvioEl = document.getElementById("ultimoEnvio");
+    const boxEnvio = document.getElementById("boxEnvio");
     const btnCalibrar = document.getElementById("calibrar");
+    const btnPermiso = document.getElementById("permiso");
 
-    // ---- INICIAR SENSOR DE ORIENTACIÓN ----
-    Protobject.Orientation.start(100);
-
-    // ---- ESTADO ----
+    // Estado interno
+    let lecturas = 0;
+    let envios = 0;
     let origen = null;
-    let anguloPrevio = null;
     let ultimoContinuous = null;
-    const UMBRAL_GRADOS = 1;
 
-    // ---- LECTURA ----
-    Protobject.Orientation.onData((data) => {
-      const cont = data.horizontalContinuous;
-      if (cont === undefined || cont === null) return;
-
-      // Guardamos siempre la última lectura, para que el botón Calibrar
-      // pueda usarla sin tener que esperar el próximo onData.
-      ultimoContinuous = cont;
-
-      if (origen === null) {
-        // Aún sin calibrar: mostrar valor crudo del sensor
-        valorEl.textContent = Math.round(cont) + "° (sin calibrar)";
-        return;
+    // ---- PASO 1: PEDIR PERMISO EN iOS 13+ ----
+    // iOS exige permiso explícito para acceder al sensor de orientación,
+    // y SOLO se puede pedir desde un evento de usuario (click/tap).
+    btnPermiso.addEventListener("click", async () => {
+      try {
+        if (typeof DeviceOrientationEvent !== "undefined" &&
+            typeof DeviceOrientationEvent.requestPermission === "function") {
+          const respuesta = await DeviceOrientationEvent.requestPermission();
+          estadoPermiso.textContent = respuesta;
+          boxPermiso.classList.add(respuesta === "granted" ? "ok" : "err");
+          if (respuesta === "granted") {
+            btnPermiso.style.display = "none";
+            iniciarSensor();
+          }
+        } else {
+          // No es iOS 13+ o no necesita permiso
+          estadoPermiso.textContent = "no requerido en este dispositivo";
+          boxPermiso.classList.add("ok");
+          btnPermiso.style.display = "none";
+          iniciarSensor();
+        }
+      } catch (err) {
+        estadoPermiso.textContent = "ERROR: " + err.message;
+        boxPermiso.classList.add("err");
       }
-
-      const angulo = cont - origen;
-      const vueltas = Math.trunc(angulo / 360);
-
-      if (anguloPrevio !== null && Math.abs(angulo - anguloPrevio) < UMBRAL_GRADOS) {
-        return;
-      }
-      anguloPrevio = angulo;
-
-      valorEl.textContent = Math.round(angulo) + "°";
-
-      Protobject.Core.send({ angulo: angulo, vueltas: vueltas }).to("index.html");
     });
 
-    // ---- CALIBRACIÓN ----
-    // Función que hace la calibración. La llamamos tanto en click como
-    // en touchstart, para que funcione en cualquier navegador.
+    // ---- PASO 2: INICIAR EL SENSOR ----
+    function iniciarSensor() {
+      Protobject.Orientation.start(100);
+
+      Protobject.Orientation.onData((data) => {
+        lecturas++;
+        contadorLecturas.textContent = lecturas;
+
+        const cont = data.horizontalContinuous;
+        const h = data.horizontal;
+
+        hcontEl.textContent = (cont !== undefined && cont !== null)
+          ? cont.toFixed(2) : "undefined";
+        hEl.textContent = (h !== undefined && h !== null)
+          ? h.toFixed(2) : "undefined";
+
+        // Si por fin recibimos algo numérico, marcamos como OK
+        if (cont !== undefined && cont !== null) {
+          ultimoContinuous = cont;
+          boxLectura.classList.add("ok");
+          boxLectura.classList.remove("err");
+        }
+
+        // Si ya calibramos, calcular y enviar
+        if (origen !== null && ultimoContinuous !== null) {
+          const angulo = ultimoContinuous - origen;
+          const vueltas = Math.trunc(angulo / 360);
+          relEl.textContent = angulo.toFixed(2) + "°";
+
+          envios++;
+          contadorEnvios.textContent = envios;
+          ultimoEnvioEl.textContent = "{ angulo: " + angulo.toFixed(1) + ", vueltas: " + vueltas + " }";
+
+          Protobject.Core.send({ angulo: angulo, vueltas: vueltas }).to("index.html");
+        }
+      });
+    }
+
+    // ---- PASO 3: BOTÓN DE CALIBRAR ----
     function calibrar(e) {
-      if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+      if (e) { e.preventDefault(); e.stopPropagation(); }
 
       if (ultimoContinuous === null) {
-        instr.textContent = "Esperando lectura del sensor... gira un poco el teléfono.";
+        estadoCalib.textContent = "ESPERA, no llega lectura aún. ¿Pediste permiso?";
+        boxCalib.classList.add("err");
         return;
       }
 
       origen = ultimoContinuous;
-      anguloPrevio = 0;
-      instr.textContent = "✓ Calibrado. Gira el teléfono como una perilla.";
+      origenEl.textContent = origen.toFixed(2);
+      estadoCalib.textContent = "✓ CALIBRADO";
+      boxCalib.classList.remove("err");
+      boxCalib.classList.add("ok");
       btnCalibrar.textContent = "🔄 RECALIBRAR";
 
-      // Enviar inmediatamente "0°" para que el PC vuelva al inicio
       Protobject.Core.send({ angulo: 0, vueltas: 0 }).to("index.html");
-      console.log("Calibrado. Origen =", origen);
     }
 
-    // En iOS, touchstart es MÁS confiable que click.
     btnCalibrar.addEventListener("touchstart", calibrar);
     btnCalibrar.addEventListener("click", calibrar);
+
+    // En navegadores que NO requieren permiso explícito (Android),
+    // arrancamos el sensor automáticamente al cargar.
+    if (typeof DeviceOrientationEvent === "undefined" ||
+        typeof DeviceOrientationEvent.requestPermission !== "function") {
+      iniciarSensor();
+      btnPermiso.style.display = "none";
+      estadoPermiso.textContent = "no requerido (auto-iniciado)";
+      boxPermiso.classList.add("ok");
+    }
   </script>
 
   <script src="config.js"></script>
