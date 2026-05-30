@@ -29,6 +29,7 @@
       color: #222;
       line-height: 1;
     }
+    /* Botón "+" que muestra el QR para conectar el teléfono */
     #ProtobjectPlusButton {
       width: auto !important;
       height: auto !important;
@@ -57,6 +58,8 @@
   <script>
     console.log("PC: pantalla iniciada, esperando datos del teléfono...");
 
+    // Recibe el número ya interpretado (0, 1 o 2) desde el teléfono
+    // y lo muestra grande en pantalla. Una entrada → un efecto.
     Protobject.Core.onReceived((valor) => {
       console.log("PC recibió:", valor);
       document.getElementById("salida").textContent = valor;

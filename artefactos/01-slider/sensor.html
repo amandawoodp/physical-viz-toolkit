@@ -59,10 +59,10 @@
     elegirYIniciar();
 
     // ---- ESTADO DE CALIBRACIÓN ----
-    let xMin = null;          // X cuando el cubo está al extremo izquierdo
-    let xMax = null;          // X cuando el cubo está al extremo derecho
+    let xMin = null;          // Y cuando el cubo está al extremo "izquierdo" del canal
+    let xMax = null;          // Y cuando el cubo está al extremo "derecho" del canal
     let etapa = "izq";        // "izq" → "der" → "listo"
-    let ultimaX = null;       // última X detectada del cubo
+    let ultimaX = null;       // última coordenada leída del cubo
     let binAnterior = null;   // última casilla enviada (0, 1 o 2)
 
     // ---- LECTURA DE MARCADORES ----
@@ -77,10 +77,13 @@
       for (const id of ids) {
         if (data[id].size > data[mejorId].size) mejorId = id;
       }
-      ultimaX = data[mejorId].position.x;
+
+      // Usamos Y porque con el teléfono horizontal el canal
+      // corre a lo largo del eje Y de la cámara, no del X.
+      ultimaX = data[mejorId].position.y;
 
       if (etapa !== "listo") {
-        valorEl.textContent = "x: " + Math.round(ultimaX);
+        valorEl.textContent = "y: " + Math.round(ultimaX);
         return;
       }
 
@@ -98,7 +101,7 @@
       if (bin !== binAnterior) {
         binAnterior = bin;
         Protobject.Core.send(bin).to("index.html");
-        console.log("Enviado al PC:", bin);
+        console.log("Teléfono envió al PC:", bin);
       }
     });
 
