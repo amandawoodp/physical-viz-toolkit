@@ -36,7 +36,7 @@
 </head>
 <body>
 
-  <h2>🔍 Diagnóstico de la perilla</h2>
+  <h2>🔍 Diagnóstico de la perilla v2</h2>
 
   <button id="permiso">PEDIR PERMISO DE ORIENTACIÓN (iOS)</button>
 
@@ -45,23 +45,16 @@
   </div>
 
   <div class="box" id="boxLectura">
-    <strong>Lecturas del sensor:</strong> <span id="contadorLecturas">0</span><br>
-    <span class="pequeno">alpha (brújula):</span> <span id="alpha">—</span><br>
-    <span class="pequeno">beta:</span> <span id="beta">—</span><br>
-    <span class="pequeno">gamma:</span> <span id="gamma">—</span><br>
-    <span class="pequeno">acumulado (continuous):</span> <span id="hcont">—</span>
+    <strong>Lecturas:</strong> <span id="contadorLecturas">0</span><br>
+    <span class="pequeno">alpha (crudo):</span> <span id="alpha">—</span><br>
+    <span class="pequeno">acumulado invertido:</span> <span id="hcont">—</span>
   </div>
 
   <button id="calibrar">📍 CALIBRAR COMO POSICIÓN 0</button>
 
   <div class="box" id="boxCalib">
     <strong>Estado:</strong> <span id="estadoCalib">sin calibrar</span><br>
-    <span class="pequeno">Origen:</span> <span id="origen">—</span><br>
     <span class="pequeno">Ángulo relativo:</span> <span id="rel">—</span>
-  </div>
-
-  <div class="box" id="boxEnvio">
-    <strong>Envíos al PC:</strong> <span id="contadorEnvios">0</span>
   </div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
@@ -71,69 +64,52 @@
     const boxPermiso = document.getElementById("boxPermiso");
     const contadorLecturas = document.getElementById("contadorLecturas");
     const alphaEl = document.getElementById("alpha");
-    const betaEl = document.getElementById("beta");
-    const gammaEl = document.getElementById("gamma");
     const hcontEl = document.getElementById("hcont");
     const boxLectura = document.getElementById("boxLectura");
     const estadoCalib = document.getElementById("estadoCalib");
-    const origenEl = document.getElementById("origen");
     const relEl = document.getElementById("rel");
     const boxCalib = document.getElementById("boxCalib");
-    const contadorEnvios = document.getElementById("contadorEnvios");
     const btnCalibrar = document.getElementById("calibrar");
     const btnPermiso = document.getElementById("permiso");
 
-    // Estado
-    let lecturas = 0;
-    let envios = 0;
-    let origen = null;
-    let acumulado = 0;        // ángulo continuo (no se reinicia en 360°)
-    let alphaAnterior = null; // para detectar saltos 360→0 y 0→360
+    // INVERTIR SENTIDO: para que girar el teléfono en horario
+    // corresponda a la flecha girando en horario en el PC.
+    // Si quieres invertir al revés, cambia este 1 por -1.
+    const SENTIDO = -1;
 
-    // ---- Escuchar el sensor DIRECTAMENTE del navegador ----
-    // Esto NO depende de Protobject. Es la API estándar W3C.
-    // 'alpha' es el ángulo de la brújula (0-360°).
+    let lecturas = 0;
+    let origen = null;
+    let acumulado = 0;
+    let alphaAnterior = null;
+
     function handler(event) {
       lecturas++;
       contadorLecturas.textContent = lecturas;
 
       const alpha = event.alpha;
-      const beta = event.beta;
-      const gamma = event.gamma;
-
       alphaEl.textContent = alpha !== null ? alpha.toFixed(2) : "null";
-      betaEl.textContent = beta !== null ? beta.toFixed(2) : "null";
-      gammaEl.textContent = gamma !== null ? gamma.toFixed(2) : "null";
 
       if (alpha === null) return;
 
-      // Construir nosotros mismos el "continuous": detectar saltos 360→0
-      // y 0→360 y acumular el delta sin que se reinicie.
+      // Acumular delta sin saltos en 360° → 0°, multiplicado por SENTIDO
       if (alphaAnterior !== null) {
         let delta = alpha - alphaAnterior;
-        if (delta > 180) delta -= 360;       // saltó de 5° a 358° (giro antihorario)
-        if (delta < -180) delta += 360;      // saltó de 358° a 5° (giro horario)
-        acumulado -= delta;
+        if (delta > 180) delta -= 360;
+        if (delta < -180) delta += 360;
+        acumulado += delta * SENTIDO;
       }
       alphaAnterior = alpha;
       hcontEl.textContent = acumulado.toFixed(2);
-
       boxLectura.classList.add("ok");
 
-      // Si ya está calibrado, enviar al PC
       if (origen !== null) {
         const angulo = acumulado - origen;
         const vueltas = Math.trunc(angulo / 360);
         relEl.textContent = angulo.toFixed(2) + "°";
-
-        envios++;
-        contadorEnvios.textContent = envios;
-
         Protobject.Core.send({ angulo: angulo, vueltas: vueltas }).to("index.html");
       }
     }
 
-    // ---- PEDIR PERMISO Y EMPEZAR ----
     btnPermiso.addEventListener("click", async () => {
       try {
         if (typeof DeviceOrientationEvent !== "undefined" &&
@@ -143,8 +119,6 @@
           boxPermiso.classList.add(respuesta === "granted" ? "ok" : "err");
           if (respuesta === "granted") {
             btnPermiso.style.display = "none";
-            // Adjuntar el listener AHORA, después del permiso, con la
-            // versión absoluta primero (más precisa en iOS).
             window.addEventListener("deviceorientationabsolute", handler, true);
             window.addEventListener("deviceorientation", handler, true);
           }
@@ -161,23 +135,18 @@
       }
     });
 
-    // ---- CALIBRAR ----
     function calibrar(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
-
       if (alphaAnterior === null) {
         estadoCalib.textContent = "ESPERA, no llega lectura. ¿Pediste permiso?";
         boxCalib.classList.add("err");
         return;
       }
-
       origen = acumulado;
-      origenEl.textContent = origen.toFixed(2);
       estadoCalib.textContent = "✓ CALIBRADO";
       boxCalib.classList.remove("err");
       boxCalib.classList.add("ok");
       btnCalibrar.textContent = "🔄 RECALIBRAR";
-
       Protobject.Core.send({ angulo: 0, vueltas: 0 }).to("index.html");
     }
 
