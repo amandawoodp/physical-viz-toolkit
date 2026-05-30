@@ -15,18 +15,21 @@ El usuario tapa o destapa la cámara del teléfono con la mano y la pantalla del
 2. Abre [la demo en vivo](https://amandawoodp.github.io/physical-viz-toolkit/artefactos/12-ambiente/) en el computador.
 3. Click en "+ Conectar teléfono". Aparece un código QR.
 4. Escanea el QR con el iPhone/Android y permite el acceso a la cámara.
-5. **Calibración en dos toques**:
+5. Espera a que el contador de lecturas empiece a subir en el teléfono.
+6. **Calibración en dos toques**:
    - Con la cámara viendo el ambiente normal → toca **"☀️ CON LUZ NORMAL"**.
    - Tapa la cámara con la mano → toca **"🌑 TAPANDO LA CÁMARA"**.
-6. Suelta. Tapa y destapa la cámara. La pantalla del PC alterna entre LUZ, PENUMBRA y SOMBRA con cambios de fondo y de ícono.
+7. Suelta. Tapa y destapa la cámara. La pantalla del PC alterna entre LUZ, PENUMBRA y SOMBRA con cambios de fondo y de ícono.
 
 ## Componente Protobject
 
-`Protobject.LightSensor` — utiliza la cámara del teléfono para medir el brillo promedio de la imagen. No es un sensor de luz "puro" en el sentido tradicional: es la cámara analizando frame a frame qué tan brillante está la escena.
+Este artefacto usa Protobject para conectar el teléfono con la pantalla del computador. El teléfono funciona como sensor y envía a `index.html` un evento semántico con la forma `{ estado, brillo }`.
+
+La medición de luz no depende de `Protobject.LightSensor`. En esta versión, `sensor.html` accede directamente a la cámara del teléfono con `getUserMedia()`, muestra una vista previa y calcula el brillo promedio de la imagen usando un `canvas`.
 
 ## Sensor y mapeo de datos
 
-`LightSensor.onData(brightness)` entrega un número de brillo (típicamente 0-255). El código aplica suavizado exponencial para evitar parpadeo, divide el rango calibrado entre los dos extremos en tres tercios y clasifica cada lectura en uno de tres estados: **luz**, **penumbra** o **sombra**.
+El teléfono toma lecturas periódicas desde la cámara y calcula un número de brillo promedio, típicamente entre 0 y 255. El código aplica suavizado exponencial para evitar parpadeo, divide el rango calibrado entre los dos extremos en tres tercios y clasifica cada lectura en uno de tres estados: **luz**, **penumbra** o **sombra**.
 
 El estudiante final solo recibe el evento semántico `{ estado, brillo }`, nunca el flujo crudo de brillos.
 
