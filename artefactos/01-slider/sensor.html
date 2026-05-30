@@ -116,9 +116,6 @@
     const btnReiniciar = document.getElementById("btnReiniciar");
     const fill = document.getElementById("fill");
 
-    // -----------------------------
-    // Parámetros de estabilidad
-    // -----------------------------
     const LECTURAS_MEDIANA = 5;
     const LECTURAS_ESTABLES_PARA_CAMBIAR = 2;
     const INTERVALO_SALIDA_MS = 160;
@@ -144,7 +141,8 @@
       const punto = obtenerPuntoDelCubo(data);
 
       if (!punto) {
-        detalle.textContent = "No veo el cubo. Acércalo, mejora la luz o revisa que el marcador mire a la cámara.";
+        detalle.textContent =
+          "No veo el cubo. Mejora la luz o revisa que el marcador mire a la cámara.";
         return;
       }
 
@@ -152,6 +150,7 @@
       estadoEl.textContent = "Lecturas: " + lecturas;
 
       historial.push(punto);
+
       if (historial.length > LECTURAS_MEDIANA) {
         historial.shift();
       }
@@ -160,10 +159,12 @@
 
       if (etapa !== "listo") {
         valorEl.textContent = "•";
+
         detalle.textContent =
-          "Cubo detectado · x=" + Math.round(ultimaLectura.x) +
-          " · y=" + Math.round(ultimaLectura.y) +
+          "Cubo detectado · x=" + formatear(ultimaLectura.x) +
+          " · y=" + formatear(ultimaLectura.y) +
           " · marcadores=" + punto.cantidad;
+
         return;
       }
 
@@ -175,14 +176,17 @@
         const tmp = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "environment" }
         });
+
         tmp.getTracks().forEach(t => t.stop());
 
         const devices = await navigator.mediaDevices.enumerateDevices();
         const camaras = devices.filter(d => d.kind === "videoinput");
 
         let idxTrasera = 0;
+
         for (let i = 0; i < camaras.length; i++) {
           const nombre = camaras[i].label.toLowerCase();
+
           if (
             nombre.includes("back") ||
             nombre.includes("posterior") ||
@@ -195,12 +199,12 @@
         }
 
         Protobject.Aruco.start(80, idxTrasera);
+
       } catch (err) {
         console.warn("No pude forzar cámara trasera. Uso cámara 0.", err);
         Protobject.Aruco.start(80, 0);
       }
 
-      // Vista previa suficientemente grande para alinear el cubo.
       Protobject.Aruco.showPreview({
         top: 260,
         left: 10,
@@ -237,8 +241,6 @@
           continue;
         }
 
-        // Si se ven varias caras del cubo, promediamos ponderando por tamaño.
-        // Esto evita saltos cuando ArUco cambia de una cara visible a otra.
         const peso = Math.max(1, Number(m.size) || 1);
 
         sumaX += m.position.x * peso;
@@ -272,12 +274,14 @@
     // Calibración
     // -----------------------------
     btnCalibrar.addEventListener("click", calibrar);
+
     btnCalibrar.addEventListener("touchstart", (e) => {
       e.preventDefault();
       calibrar();
     });
 
     btnReiniciar.addEventListener("click", reiniciar);
+
     btnReiniciar.addEventListener("touchstart", (e) => {
       e.preventDefault();
       reiniciar();
@@ -285,42 +289,94 @@
 
     function calibrar() {
       if (!ultimaLectura) {
-        instr.textContent = "Aún no veo el cubo. Apunta bien la cámara y vuelve a tocar.";
+        instr.textContent =
+          "Aún no veo el cubo. Apunta bien la cámara y vuelve a tocar.";
         return;
       }
 
       if (etapa === "calibrar0") {
-        punto0 = { x: ultimaLectura.x, y: ultimaLectura.y };
+        punto0 = {
+          x: ultimaLectura.x,
+          y: ultimaLectura.y
+        };
+
         etapa = "calibrar2";
 
-        instr.textContent = "Ahora pon el cubo en el extremo 2 y toca calibrar.";
+        instr.textContent =
+          "Ahora pon el cubo en el extremo 2 y toca calibrar.";
+
         btnCalibrar.textContent = "Calibrar extremo 2";
         btnCalibrar.classList.add("done");
+
+        detalle.textContent =
+          "Extremo 0 guardado · x=" + formatear(punto0.x) +
+          " · y=" + formatear(punto0.y);
 
         return;
       }
 
       if (etapa === "calibrar2") {
-        punto2 = { x: ultimaLectura.x, y: ultimaLectura.y };
+        punto2 = {
+          x: ultimaLectura.x,
+          y: ultimaLectura.y
+        };
 
         const dx = Math.abs(punto2.x - punto0.x);
         const dy = Math.abs(punto2.y - punto0.y);
 
         eje = dx >= dy ? "x" : "y";
 
-        if (Math.max(dx, dy) < 20) {
-          instr.textContent = "Los extremos quedaron muy cerca. Baja un poco el teléfono, alarga el canal o recalibra.";
+        const distancia = Math.max(dx, dy);
+
+        // IMPORTANTE:
+        // Protobject puede entregar coordenadas normalizadas tipo 0–1
+        // o coordenadas en pixeles. Por eso el umbral no puede ser fijo.
+        const maxCoord = Math.max(
+          Math.abs(punto0.x),
+          Math.abs(punto0.y),
+          Math.abs(punto2.x),
+          Math.abs(punto2.y)
+        );
+
+        let umbralMinimo;
+
+        if (maxCoord <= 2) {
+          // Coordenadas normalizadas
+          umbralMinimo = 0.03;
+        } else if (maxCoord <= 100) {
+          // Coordenadas medianas
+          umbralMinimo = 3;
+        } else {
+          // Coordenadas en pixeles
+          umbralMinimo = 12;
+        }
+
+        if (distancia < umbralMinimo) {
+          instr.textContent =
+            "Los extremos quedaron muy cerca. Recalibra moviendo más el cubo.";
+
+          detalle.textContent =
+            "Distancia=" + formatear(distancia) +
+            " · mínimo=" + formatear(umbralMinimo) +
+            " · dx=" + formatear(dx) +
+            " · dy=" + formatear(dy);
+
           return;
         }
 
         etapa = "listo";
+
         btnCalibrar.textContent = "✓ Calibrado";
         btnCalibrar.classList.add("done");
 
-        instr.textContent = "Listo. Desliza el cubo lentamente por el canal.";
-        detalle.textContent = "Eje usado: " + eje.toUpperCase() + " · salida gradual sin saltos.";
+        instr.textContent =
+          "Listo. Desliza el cubo lentamente por el canal.";
 
-        // Inicializar el valor actual en la posición en que quedó el cubo.
+        detalle.textContent =
+          "Eje usado: " + eje.toUpperCase() +
+          " · distancia=" + formatear(distancia) +
+          " · salida gradual 0–1–2.";
+
         actualizarSlider(ultimaLectura, true);
 
         return;
@@ -343,7 +399,10 @@
 
       valorEl.textContent = "—";
       fill.style.width = "0%";
-      instr.textContent = "Pon el cubo en el extremo 0 del canal y toca calibrar.";
+
+      instr.textContent =
+        "Pon el cubo en el extremo 0 del canal y toca calibrar.";
+
       detalle.textContent = "Buscando cubo ArUco...";
     }
 
@@ -358,13 +417,12 @@
       let t = (actual - inicio) / (fin - inicio);
       t = Math.max(0, Math.min(1, t));
 
-      // Tres zonas: 0, 1, 2.
+      // Tres posiciones: 0, 1, 2
       let binCrudo = Math.floor(t * 3);
       binCrudo = Math.max(0, Math.min(2, binCrudo));
 
       fill.style.width = (t * 100).toFixed(1) + "%";
 
-      // Pequeño filtro de estabilidad para que no tiemble entre dos casillas.
       if (binCrudo === binCandidato) {
         contadorCandidato++;
       } else {
@@ -381,7 +439,8 @@
         " · objetivo=" + binCrudo +
         " · eje=" + eje.toUpperCase();
 
-      if (iniciarSinAnimacion && binObjetivo !== null) {
+      if (iniciarSinAnimacion) {
+        binObjetivo = binCrudo;
         binActual = binObjetivo;
         enviarValor(binActual);
       }
@@ -412,6 +471,14 @@
       Protobject.Core.send(valor).to("index.html");
 
       console.log("Slider envió:", valor);
+    }
+
+    function formatear(n) {
+      if (Math.abs(n) < 10) {
+        return n.toFixed(3);
+      }
+
+      return Math.round(n);
     }
   </script>
 
