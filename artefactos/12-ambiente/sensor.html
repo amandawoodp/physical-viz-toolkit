@@ -12,6 +12,9 @@
     #instr {
       font-size: 20px; margin-top: 20px; color: #333;
     }
+    #lecturas {
+      font-size: 14px; color: #666; margin-top: 5px;
+    }
     #valor {
       font-size: 45px; margin: 25px 0; color: #2a7; font-weight: bold;
     }
@@ -37,6 +40,7 @@
 <body>
 
   <div id="instr">Inicializando cámara para medir luz...</div>
+  <div id="lecturas">Lecturas recibidas: 0</div>
 
   <div id="valor">—</div>
   <div id="brillo-bar"><div id="brillo-fill"></div></div>
@@ -48,22 +52,54 @@
 
   <script>
     const instr = document.getElementById("instr");
+    const lecturasEl = document.getElementById("lecturas");
     const valorEl = document.getElementById("valor");
     const brilloFill = document.getElementById("brillo-fill");
     const btnLuz = document.getElementById("calLuz");
     const btnSombra = document.getElementById("calSombra");
 
-    // Estado
     let ultimoBrillo = null;
-    let brilloLuz = null;       // referencia para "ambiente con luz"
-    let brilloSombra = null;    // referencia para "tapando la cámara"
+    let brilloLuz = null;
+    let brilloSombra = null;
     let estadoAnterior = null;
+    let contadorLecturas = 0;
 
-    // Suavizado para evitar parpadeo en los bordes entre estados
     const SUAVIZADO = 0.3;
     let brilloSuavizado = 0;
 
-    // ---- ARRANQUE: forzar cámara trasera (mismo truco que en el slider) ----
+    // ===========================================================
+    // 1) REGISTRAR EL CALLBACK PRIMERO, antes de start().
+    // ===========================================================
+    Protobject.LightSensor.onData((brightness) => {
+      contadorLecturas++;
+      lecturasEl.textContent = "Lecturas recibidas: " + contadorLecturas;
+
+      ultimoBrillo = brightness;
+      brilloSuavizado = brilloSuavizado * SUAVIZADO + brightness * (1 - SUAVIZADO);
+
+      valorEl.textContent = Math.round(brilloSuavizado);
+      brilloFill.style.width = Math.min(100, brilloSuavizado / 255 * 100) + "%";
+
+      if (brilloLuz === null || brilloSombra === null) return;
+
+      const min = Math.min(brilloLuz, brilloSombra);
+      const max = Math.max(brilloLuz, brilloSombra);
+      const tercio = (max - min) / 3;
+
+      let estado;
+      if (brilloSuavizado < min + tercio) estado = "sombra";
+      else if (brilloSuavizado < min + 2 * tercio) estado = "penumbra";
+      else estado = "luz";
+
+      if (estado !== estadoAnterior) {
+        estadoAnterior = estado;
+        Protobject.Core.send({ estado: estado, brillo: brilloSuavizado }).to("index.html");
+      }
+    });
+
+    // ===========================================================
+    // 2) ARRANCAR EL SENSOR con cámara trasera forzada.
+    // ===========================================================
     async function elegirYIniciar() {
       try {
         const tmp = await navigator.mediaDevices.getUserMedia({
@@ -83,10 +119,12 @@
             break;
           }
         }
+        console.log("Usando cámara índice:", idxTrasera);
 
         Protobject.LightSensor.start(200, idxTrasera);
       } catch (err) {
-        console.warn("Falló elección de cámara:", err);
+        console.warn("Falló forzar trasera:", err);
+        // Fallback: probar índice 0 directamente
         Protobject.LightSensor.start(200, 0);
       }
 
@@ -96,46 +134,13 @@
     }
     elegirYIniciar();
 
-    // ---- LECTURA ----
-    // LightSensor entrega un número de brillo (típicamente 0-255 según
-    // el promedio de luminosidad de los pixeles). Lo procesamos en
-    // 3 categorías semánticas usando 2 umbrales calibrados.
-    Protobject.LightSensor.onData((brightness) => {
-      ultimoBrillo = brightness;
-
-      // Suavizado
-      brilloSuavizado = brilloSuavizado * SUAVIZADO + brightness * (1 - SUAVIZADO);
-
-      valorEl.textContent = Math.round(brilloSuavizado);
-
-      // Pintar la barra (asumimos brillo 0-255, normalizamos al ancho)
-      brilloFill.style.width = Math.min(100, brilloSuavizado / 255 * 100) + "%";
-
-      // Si no se calibró, no enviamos eventos semánticos todavía
-      if (brilloLuz === null || brilloSombra === null) return;
-
-      // Calcular umbrales: dividimos el rango calibrado en tres tercios
-      const min = Math.min(brilloLuz, brilloSombra);
-      const max = Math.max(brilloLuz, brilloSombra);
-      const tercio = (max - min) / 3;
-
-      let estado;
-      if (brilloSuavizado < min + tercio) estado = "sombra";
-      else if (brilloSuavizado < min + 2 * tercio) estado = "penumbra";
-      else estado = "luz";
-
-      // Enviar al PC solo cuando cambia el estado
-      if (estado !== estadoAnterior) {
-        estadoAnterior = estado;
-        Protobject.Core.send({ estado: estado, brillo: brilloSuavizado }).to("index.html");
-      }
-    });
-
-    // ---- CALIBRACIÓN DE LOS DOS EXTREMOS ----
+    // ===========================================================
+    // 3) CALIBRACIÓN
+    // ===========================================================
     function calibrar(esLuz, e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       if (ultimoBrillo === null) {
-        instr.textContent = "Esperando lectura de la cámara...";
+        instr.textContent = "Aún no llegan lecturas. Espera 2 segundos y vuelve a tocar.";
         return;
       }
 
