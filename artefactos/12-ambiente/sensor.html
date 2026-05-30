@@ -4,49 +4,125 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Sensor ambiente</title>
+
   <style>
     body {
-      font-family: sans-serif; padding: 20px; margin: 0;
-      background: #fafafa; text-align: center;
+      font-family: sans-serif;
+      padding: 20px;
+      margin: 0;
+      background: #fafafa;
+      text-align: center;
+      color: #222;
     }
+
     #instr {
-      font-size: 20px; margin-top: 20px; color: #333;
+      font-size: 20px;
+      margin-top: 20px;
+      color: #333;
+      line-height: 1.35;
     }
+
     #lecturas {
-      font-size: 14px; color: #666; margin-top: 5px;
+      font-size: 14px;
+      color: #666;
+      margin-top: 8px;
     }
+
     #valor {
-      font-size: 45px; margin: 25px 0; color: #2a7; font-weight: bold;
+      font-size: 45px;
+      margin: 25px 0 10px;
+      color: #2a7;
+      font-weight: bold;
     }
+
+    #estadoLocal {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 18px;
+      color: #444;
+    }
+
     #brillo-bar {
-      width: 100%; height: 30px; background: #eee;
-      border-radius: 15px; overflow: hidden; margin: 20px 0;
+      width: 100%;
+      height: 30px;
+      background: #eee;
+      border-radius: 15px;
+      overflow: hidden;
+      margin: 20px 0;
     }
+
     #brillo-fill {
-      height: 100%; width: 0%;
+      height: 100%;
+      width: 0%;
       background: linear-gradient(to right, #111827, #9ca3af, #fef3c7);
       transition: width 0.2s;
     }
+
     button {
-      display: block; width: 100%; padding: 22px; font-size: 20px;
-      font-weight: bold; background: #2a7; color: white;
-      border: none; border-radius: 14px; margin: 12px 0;
+      display: block;
+      width: 100%;
+      padding: 22px;
+      font-size: 20px;
+      font-weight: bold;
+      background: #2a7;
+      color: white;
+      border: none;
+      border-radius: 14px;
+      margin: 12px 0;
       touch-action: manipulation;
     }
-    button.done { background: #94d2bd; }
-    button:active { background: #1a5; }
+
+    button.done {
+      background: #94d2bd;
+      color: #064e3b;
+    }
+
+    button:active {
+      background: #1a5;
+    }
+
+    #preview {
+      width: 100%;
+      max-width: 340px;
+      margin-top: 20px;
+      border-radius: 16px;
+      background: #000;
+      display: none;
+    }
+
+    #debug {
+      margin-top: 14px;
+      font-size: 12px;
+      color: #777;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    canvas {
+      display: none;
+    }
   </style>
 </head>
+
 <body>
 
   <div id="instr">Inicializando cámara para medir luz...</div>
   <div id="lecturas">Lecturas recibidas: 0</div>
 
   <div id="valor">—</div>
-  <div id="brillo-bar"><div id="brillo-fill"></div></div>
+  <div id="estadoLocal">Esperando calibración</div>
+
+  <div id="brillo-bar">
+    <div id="brillo-fill"></div>
+  </div>
 
   <button id="calLuz" style="display:none">☀️ CON LUZ NORMAL</button>
   <button id="calSombra" style="display:none">🌑 TAPANDO LA CÁMARA</button>
+
+  <video id="preview" autoplay playsinline muted></video>
+  <canvas id="canvas" width="80" height="60"></canvas>
+
+  <div id="debug"></div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
@@ -54,9 +130,14 @@
     const instr = document.getElementById("instr");
     const lecturasEl = document.getElementById("lecturas");
     const valorEl = document.getElementById("valor");
+    const estadoLocalEl = document.getElementById("estadoLocal");
     const brilloFill = document.getElementById("brillo-fill");
     const btnLuz = document.getElementById("calLuz");
     const btnSombra = document.getElementById("calSombra");
+    const video = document.getElementById("preview");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const debug = document.getElementById("debug");
 
     let ultimoBrillo = null;
     let brilloLuz = null;
@@ -67,107 +148,194 @@
     const SUAVIZADO = 0.3;
     let brilloSuavizado = 0;
 
-    // ===========================================================
-    // 1) REGISTRAR EL CALLBACK PRIMERO, antes de start().
-    // ===========================================================
-    Protobject.LightSensor.onData((brightness) => {
+    const INTERVALO_MS = 200;
+
+    function escribirDebug(texto) {
+      debug.textContent = texto;
+      console.log(texto);
+    }
+
+    function calcularBrilloPromedio() {
+      if (!video.videoWidth || !video.videoHeight) {
+        return null;
+      }
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = frame.data;
+
+      let suma = 0;
+      let totalPixeles = 0;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+
+        // Fórmula estándar aproximada de luminancia percibida
+        const brillo = 0.299 * r + 0.587 * g + 0.114 * b;
+
+        suma += brillo;
+        totalPixeles++;
+      }
+
+      return suma / totalPixeles;
+    }
+
+    function procesarLectura(brightness) {
       contadorLecturas++;
       lecturasEl.textContent = "Lecturas recibidas: " + contadorLecturas;
 
       ultimoBrillo = brightness;
-      brilloSuavizado = brilloSuavizado * SUAVIZADO + brightness * (1 - SUAVIZADO);
+
+      if (contadorLecturas === 1) {
+        brilloSuavizado = brightness;
+      } else {
+        brilloSuavizado =
+          brilloSuavizado * SUAVIZADO + brightness * (1 - SUAVIZADO);
+      }
 
       valorEl.textContent = Math.round(brilloSuavizado);
-      brilloFill.style.width = Math.min(100, brilloSuavizado / 255 * 100) + "%";
+      brilloFill.style.width =
+        Math.min(100, brilloSuavizado / 255 * 100) + "%";
 
-      if (brilloLuz === null || brilloSombra === null) return;
+      if (brilloLuz === null || brilloSombra === null) {
+        estadoLocalEl.textContent = "Esperando calibración";
+        return;
+      }
 
       const min = Math.min(brilloLuz, brilloSombra);
       const max = Math.max(brilloLuz, brilloSombra);
-      const tercio = (max - min) / 3;
+      const rango = max - min;
+
+      if (rango < 10) {
+        estadoLocalEl.textContent =
+          "Rango muy bajo: prueba con más diferencia entre luz y sombra";
+        return;
+      }
+
+      const tercio = rango / 3;
 
       let estado;
-      if (brilloSuavizado < min + tercio) estado = "sombra";
-      else if (brilloSuavizado < min + 2 * tercio) estado = "penumbra";
-      else estado = "luz";
+
+      if (brilloSuavizado < min + tercio) {
+        estado = "sombra";
+      } else if (brilloSuavizado < min + 2 * tercio) {
+        estado = "penumbra";
+      } else {
+        estado = "luz";
+      }
+
+      estadoLocalEl.textContent = "Estado: " + estado.toUpperCase();
 
       if (estado !== estadoAnterior) {
         estadoAnterior = estado;
-        Protobject.Core.send({ estado: estado, brillo: brilloSuavizado }).to("index.html");
+
+        Protobject.Core.send({
+          estado: estado,
+          brillo: brilloSuavizado
+        }).to("index.html");
       }
-    });
-
-    // ===========================================================
-    // 2) ARRANCAR EL SENSOR con cámara trasera forzada.
-    // ===========================================================
-    async function elegirYIniciar() {
-      try {
-        const tmp = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" }
-        });
-        tmp.getTracks().forEach(t => t.stop());
-
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const camaras = devices.filter(d => d.kind === "videoinput");
-
-        let idxTrasera = 0;
-        for (let i = 0; i < camaras.length; i++) {
-          const nombre = camaras[i].label.toLowerCase();
-          if (nombre.includes("back") || nombre.includes("posterior") ||
-              nombre.includes("rear") || nombre.includes("trasera")) {
-            idxTrasera = i;
-            break;
-          }
-        }
-        console.log("Usando cámara índice:", idxTrasera);
-
-        Protobject.LightSensor.start(200, idxTrasera);
-      } catch (err) {
-        console.warn("Falló forzar trasera:", err);
-        // Fallback: probar índice 0 directamente
-        Protobject.LightSensor.start(200, 0);
-      }
-
-      instr.textContent = "Apunta la cámara hacia donde quieres medir la luz.";
-      btnLuz.style.display = "block";
-      btnSombra.style.display = "block";
     }
-    elegirYIniciar();
 
-    // ===========================================================
-    // 3) CALIBRACIÓN
-    // ===========================================================
+    async function iniciarCamara() {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          instr.textContent =
+            "Este navegador no permite acceder a la cámara.";
+          return;
+        }
+
+        const constraints = {
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          },
+          audio: false
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        video.srcObject = stream;
+        video.style.display = "block";
+
+        await video.play();
+
+        instr.textContent =
+          "Apunta la cámara hacia donde quieres medir la luz.";
+        btnLuz.style.display = "block";
+        btnSombra.style.display = "block";
+
+        escribirDebug("Cámara iniciada correctamente.");
+
+        setInterval(() => {
+          const brillo = calcularBrilloPromedio();
+
+          if (brillo !== null && !Number.isNaN(brillo)) {
+            procesarLectura(brillo);
+          }
+        }, INTERVALO_MS);
+
+      } catch (err) {
+        console.error(err);
+
+        instr.textContent =
+          "No se pudo iniciar la cámara. Revisa permisos del navegador.";
+
+        escribirDebug(
+          "Error cámara: " + err.name + " / " + err.message
+        );
+      }
+    }
+
     function calibrar(esLuz, e) {
-      if (e) { e.preventDefault(); e.stopPropagation(); }
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
       if (ultimoBrillo === null) {
-        instr.textContent = "Aún no llegan lecturas. Espera 2 segundos y vuelve a tocar.";
+        instr.textContent =
+          "Aún no llegan lecturas. Espera 2 segundos y vuelve a tocar.";
         return;
       }
 
       if (esLuz) {
         brilloLuz = brilloSuavizado;
-        btnLuz.textContent = "✓ LUZ NORMAL calibrada en " + Math.round(brilloLuz);
+
+        btnLuz.textContent =
+          "✓ LUZ NORMAL calibrada en " + Math.round(brilloLuz);
+
         btnLuz.classList.add("done");
-        instr.textContent = "Ahora tapa la cámara con la mano y toca 'TAPANDO LA CÁMARA'.";
+
+        instr.textContent =
+          "Ahora tapa la cámara con la mano y toca 'TAPANDO LA CÁMARA'.";
+
       } else {
         brilloSombra = brilloSuavizado;
-        btnSombra.textContent = "✓ SOMBRA calibrada en " + Math.round(brilloSombra);
+
+        btnSombra.textContent =
+          "✓ SOMBRA calibrada en " + Math.round(brilloSombra);
+
         btnSombra.classList.add("done");
-        instr.textContent = "✓ Listo. Tapa y destapa la cámara para ver los cambios.";
+
+        instr.textContent =
+          "✓ Listo. Tapa y destapa la cámara para ver los cambios.";
       }
     }
 
     btnLuz.addEventListener("touchstart", (e) => calibrar(true, e));
     btnLuz.addEventListener("click", (e) => calibrar(true, e));
+
     btnSombra.addEventListener("touchstart", (e) => calibrar(false, e));
     btnSombra.addEventListener("click", (e) => calibrar(false, e));
 
-        setTimeout(() => {
-      Protobject.LightSensor.showPreview({ top: 350, left: 10, width: 280, height: 200 });
-    }, 1500);
-  
+    iniciarCamara();
   </script>
 
   <script src="config.js"></script>
+
 </body>
 </html>
