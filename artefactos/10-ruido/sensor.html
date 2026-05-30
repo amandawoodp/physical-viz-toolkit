@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Sensor ruido</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: sans-serif; padding: 20px; margin: 0;
+      background: #fafafa; text-align: center;
+    }
+    #instr {
+      font-size: 20px; margin-top: 20px; color: #333;
+      min-height: 3em;
+    }
+    #valor {
+      font-size: 45px; margin: 20px 0; color: #2a7; font-weight: bold;
+    }
+    #lecturas { font-size: 13px; color: #888; }
+    button {
+      display: block; width: 100%; padding: 20px; font-size: 19px;
+      font-weight: bold; border: none; border-radius: 14px;
+      margin: 10px 0; touch-action: manipulation; cursor: pointer;
+    }
+    #iniciar { background: #e63946; color: white; }
+    .cal { background: #2a7; color: white; }
+    .cal:active { background: #1a5; }
+    .cal.done { background: #94d2bd; }
+    .cal:disabled { background: #ccc; }
+  </style>
+</head>
+<body>
+
+  <button id="iniciar">🎤 INICIAR MICRÓFONO</button>
+
+  <div id="instr">Toca "Iniciar micrófono" y permite el acceso.</div>
+
+  <div id="valor">—</div>
+  <div id="lecturas">Lecturas: 0</div>
+
+  <button id="calBase" class="cal" style="display:none" disabled>🤫 GRABAR RUIDO AMBIENTE</button>
+  <button id="calFuerte" class="cal" style="display:none" disabled>👏 GRABAR SONIDO FUERTE</button>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    const instr = document.getElementById("instr");
+    const valorEl = document.getElementById("valor");
+    const lecturasEl = document.getElementById("lecturas");
+    const btnIniciar = document.getElementById("iniciar");
+    const btnBase = document.getElementById("calBase");
+    const btnFuerte = document.getElementById("calFuerte");
+
+    // Estado del sensor
+    let contadorLecturas = 0;
+    let ultimaIntensidad = null;
+    let ruidoBase = null;       // nivel de silencio ambiente
+    let nivelFuerte = null;     // nivel de un sonido fuerte de referencia
+
+    // ----- Lógica de evento "BANG" -----
+    // El sensor de ruido entrega un valor continuo. Para emitir un
+    // evento semántico ("hubo un aplauso"), aplicamos:
+    //  - umbral: hay que superar (ruidoBase + 0.6*(nivelFuerte - ruidoBase))
+    //  - duración mínima: la intensidad debe estar sobre el umbral
+    //    durante al menos DURACION_MS milisegundos seguidos.
+    //  - cooldown: tras emitir un evento, esperamos COOLDOWN_MS antes
+    //    de emitir el siguiente (evita disparos múltiples por un solo
+    //    aplauso que vibra).
+    const DURACION_MS = 80;     // sonido debe sostenerse al menos 80ms
+    const COOLDOWN_MS = 400;    // espera 400ms entre eventos
+
+    let umbralCalculado = null;
+    let inicioSobreUmbral = null;
+    let ultimoEvento = 0;
+
+    // ---- INICIAR MICRÓFONO ----
+    // El navegador exige interacción del usuario para pedir permiso
+    // de micrófono. Por eso el botón rojo de "Iniciar micrófono":
+    // el toque dispara la solicitud de permiso.
+    btnIniciar.addEventListener("click", () => {
+      Protobject.NoiseSensor.start(100);  // muestreo cada 100ms
+      btnIniciar.style.display = "none";
+      btnBase.style.display = "block";
+      btnFuerte.style.display = "block";
+      btnBase.disabled = false;
+      btnFuerte.disabled = false;
+      instr.textContent = "Quédate en silencio y toca 'GRABAR RUIDO AMBIENTE'.";
+    });
+
+    // ---- LECTURA ----
+    Protobject.NoiseSensor.onData((intensity) => {
+      contadorLecturas++;
+      lecturasEl.textContent = "Lecturas: " + contadorLecturas;
+      ultimaIntensidad = intensity;
+      valorEl.textContent = Math.round(intensity);
+
+      // Si ya está calibrado, calcular intensidad normalizada y umbral
+      if (ruidoBase !== null && nivelFuerte !== null) {
+        // Normalizar a 0-100% para la barra del PC
+        let pct = (intensity - ruidoBase) / (nivelFuerte - ruidoBase) * 100;
+        pct = Math.max(0, Math.min(100, pct));
+
+        // Umbral fijo al 60% del rango calibrado
+        const umbralPct = 60;
+
+        // Enviar la lectura para la barra animada
+        Protobject.Core.send({ tipo: "nivel", intensidad: pct, umbral: umbralPct }).to("index.html");
+
+        // Detectar evento: ¿está sobre el umbral durante DURACION_MS?
+        const ahora = Date.now();
+        if (pct >= umbralPct) {
+          if (inicioSobreUmbral === null) inicioSobreUmbral = ahora;
+          else if (ahora - inicioSobreUmbral >= DURACION_MS &&
+                   ahora - ultimoEvento >= COOLDOWN_MS) {
+            ultimoEvento = ahora;
+            Protobject.Core.send({ tipo: "evento" }).to("index.html");
+            instr.textContent = "¡Sonido detectado!";
+          }
+        } else {
+          inicioSobreUmbral = null;
+        }
+      }
+    });
+
+    // ---- CALIBRACIÓN ----
+    function calibrar(esBase, e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      if (ultimaIntensidad === null) {
+        instr.textContent = "Aún no llegan lecturas del micrófono.";
+        return;
+      }
+
+      if (esBase) {
+        ruidoBase = ultimaIntensidad;
+        btnBase.textContent = "✓ AMBIENTE: " + Math.round(ruidoBase);
+        btnBase.classList.add("done");
+        instr.textContent = "Ahora aplaude justo cuando toques 'GRABAR SONIDO FUERTE'.";
+      } else {
+        nivelFuerte = ultimaIntensidad;
+        if (nivelFuerte <= ruidoBase) {
+          // Si el sonido fuerte fue más débil que el ambiente, ajustar
+          nivelFuerte = ruidoBase * 2 + 10;
+        }
+        btnFuerte.textContent = "✓ FUERTE: " + Math.round(nivelFuerte);
+        btnFuerte.classList.add("done");
+        instr.textContent = "✓ Listo. Aplaude, sopla o grita.";
+      }
+    }
+
+    btnBase.addEventListener("touchstart", (e) => calibrar(true, e));
+    btnBase.addEventListener("click", (e) => calibrar(true, e));
+    btnFuerte.addEventListener("touchstart", (e) => calibrar(false, e));
+    btnFuerte.addEventListener("click", (e) => calibrar(false, e));
+  </script>
+
+  <script src="config.js"></script>
+</body>
+</html>
