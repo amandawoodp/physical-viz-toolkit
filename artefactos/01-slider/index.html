@@ -52,12 +52,8 @@
   <div id="subtitulo">Desliza el cubo por el canal: izquierda, centro o derecha</div>
   <div id="salida">—</div>
 
-  <!-- 1) Cargar el framework Protobject -->
   <script src="https://app.protobject.com/framework/p.js"></script>
 
-  <!-- 2) REGISTRAR EL CALLBACK ANTES de config.js -->
-  <!-- Esto es crítico: cuando config.js corra initialize() y se
-       abran las conexiones, el callback ya debe estar listo. -->
   <script>
     console.log("PC: registrando callback onReceived...");
     Protobject.Core.onReceived((valor) => {
@@ -66,7 +62,6 @@
     });
   </script>
 
-  <!-- 3) Recién ahora inicializar Protobject -->
   <script src="config.js"></script>
 
 </body>
