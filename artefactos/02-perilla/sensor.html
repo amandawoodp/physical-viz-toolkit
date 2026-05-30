@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Sensor perilla (debug)</title>
+  <title>Sensor perilla</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -46,8 +46,10 @@
 
   <div class="box" id="boxLectura">
     <strong>Lecturas del sensor:</strong> <span id="contadorLecturas">0</span><br>
-    <span class="pequeno">horizontalContinuous:</span> <span id="hcont">—</span><br>
-    <span class="pequeno">horizontal:</span> <span id="h">—</span>
+    <span class="pequeno">alpha (brújula):</span> <span id="alpha">—</span><br>
+    <span class="pequeno">beta:</span> <span id="beta">—</span><br>
+    <span class="pequeno">gamma:</span> <span id="gamma">—</span><br>
+    <span class="pequeno">acumulado (continuous):</span> <span id="hcont">—</span>
   </div>
 
   <button id="calibrar">📍 CALIBRAR COMO POSICIÓN 0</button>
@@ -59,39 +61,79 @@
   </div>
 
   <div class="box" id="boxEnvio">
-    <strong>Envíos al PC:</strong> <span id="contadorEnvios">0</span><br>
-    <span class="pequeno">Último enviado:</span> <span id="ultimoEnvio">—</span>
+    <strong>Envíos al PC:</strong> <span id="contadorEnvios">0</span>
   </div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
-    // Referencias a los elementos de la UI
     const estadoPermiso = document.getElementById("estadoPermiso");
     const boxPermiso = document.getElementById("boxPermiso");
     const contadorLecturas = document.getElementById("contadorLecturas");
+    const alphaEl = document.getElementById("alpha");
+    const betaEl = document.getElementById("beta");
+    const gammaEl = document.getElementById("gamma");
     const hcontEl = document.getElementById("hcont");
-    const hEl = document.getElementById("h");
     const boxLectura = document.getElementById("boxLectura");
     const estadoCalib = document.getElementById("estadoCalib");
     const origenEl = document.getElementById("origen");
     const relEl = document.getElementById("rel");
     const boxCalib = document.getElementById("boxCalib");
     const contadorEnvios = document.getElementById("contadorEnvios");
-    const ultimoEnvioEl = document.getElementById("ultimoEnvio");
-    const boxEnvio = document.getElementById("boxEnvio");
     const btnCalibrar = document.getElementById("calibrar");
     const btnPermiso = document.getElementById("permiso");
 
-    // Estado interno
+    // Estado
     let lecturas = 0;
     let envios = 0;
     let origen = null;
-    let ultimoContinuous = null;
+    let acumulado = 0;        // ángulo continuo (no se reinicia en 360°)
+    let alphaAnterior = null; // para detectar saltos 360→0 y 0→360
 
-    // ---- PASO 1: PEDIR PERMISO EN iOS 13+ ----
-    // iOS exige permiso explícito para acceder al sensor de orientación,
-    // y SOLO se puede pedir desde un evento de usuario (click/tap).
+    // ---- Escuchar el sensor DIRECTAMENTE del navegador ----
+    // Esto NO depende de Protobject. Es la API estándar W3C.
+    // 'alpha' es el ángulo de la brújula (0-360°).
+    function handler(event) {
+      lecturas++;
+      contadorLecturas.textContent = lecturas;
+
+      const alpha = event.alpha;
+      const beta = event.beta;
+      const gamma = event.gamma;
+
+      alphaEl.textContent = alpha !== null ? alpha.toFixed(2) : "null";
+      betaEl.textContent = beta !== null ? beta.toFixed(2) : "null";
+      gammaEl.textContent = gamma !== null ? gamma.toFixed(2) : "null";
+
+      if (alpha === null) return;
+
+      // Construir nosotros mismos el "continuous": detectar saltos 360→0
+      // y 0→360 y acumular el delta sin que se reinicie.
+      if (alphaAnterior !== null) {
+        let delta = alpha - alphaAnterior;
+        if (delta > 180) delta -= 360;       // saltó de 5° a 358° (giro antihorario)
+        if (delta < -180) delta += 360;      // saltó de 358° a 5° (giro horario)
+        acumulado += delta;
+      }
+      alphaAnterior = alpha;
+      hcontEl.textContent = acumulado.toFixed(2);
+
+      boxLectura.classList.add("ok");
+
+      // Si ya está calibrado, enviar al PC
+      if (origen !== null) {
+        const angulo = acumulado - origen;
+        const vueltas = Math.trunc(angulo / 360);
+        relEl.textContent = angulo.toFixed(2) + "°";
+
+        envios++;
+        contadorEnvios.textContent = envios;
+
+        Protobject.Core.send({ angulo: angulo, vueltas: vueltas }).to("index.html");
+      }
+    }
+
+    // ---- PEDIR PERMISO Y EMPEZAR ----
     btnPermiso.addEventListener("click", async () => {
       try {
         if (typeof DeviceOrientationEvent !== "undefined" &&
@@ -101,14 +143,17 @@
           boxPermiso.classList.add(respuesta === "granted" ? "ok" : "err");
           if (respuesta === "granted") {
             btnPermiso.style.display = "none";
-            iniciarSensor();
+            // Adjuntar el listener AHORA, después del permiso, con la
+            // versión absoluta primero (más precisa en iOS).
+            window.addEventListener("deviceorientationabsolute", handler, true);
+            window.addEventListener("deviceorientation", handler, true);
           }
         } else {
-          // No es iOS 13+ o no necesita permiso
-          estadoPermiso.textContent = "no requerido en este dispositivo";
+          estadoPermiso.textContent = "no requerido";
           boxPermiso.classList.add("ok");
           btnPermiso.style.display = "none";
-          iniciarSensor();
+          window.addEventListener("deviceorientationabsolute", handler, true);
+          window.addEventListener("deviceorientation", handler, true);
         }
       } catch (err) {
         estadoPermiso.textContent = "ERROR: " + err.message;
@@ -116,55 +161,17 @@
       }
     });
 
-    // ---- PASO 2: INICIAR EL SENSOR ----
-    function iniciarSensor() {
-      Protobject.Orientation.start(100);
-
-      Protobject.Orientation.onData((data) => {
-        lecturas++;
-        contadorLecturas.textContent = lecturas;
-
-        const cont = data.horizontalContinuous;
-        const h = data.horizontal;
-
-        hcontEl.textContent = (cont !== undefined && cont !== null)
-          ? cont.toFixed(2) : "undefined";
-        hEl.textContent = (h !== undefined && h !== null)
-          ? h.toFixed(2) : "undefined";
-
-        // Si por fin recibimos algo numérico, marcamos como OK
-        if (cont !== undefined && cont !== null) {
-          ultimoContinuous = cont;
-          boxLectura.classList.add("ok");
-          boxLectura.classList.remove("err");
-        }
-
-        // Si ya calibramos, calcular y enviar
-        if (origen !== null && ultimoContinuous !== null) {
-          const angulo = ultimoContinuous - origen;
-          const vueltas = Math.trunc(angulo / 360);
-          relEl.textContent = angulo.toFixed(2) + "°";
-
-          envios++;
-          contadorEnvios.textContent = envios;
-          ultimoEnvioEl.textContent = "{ angulo: " + angulo.toFixed(1) + ", vueltas: " + vueltas + " }";
-
-          Protobject.Core.send({ angulo: angulo, vueltas: vueltas }).to("index.html");
-        }
-      });
-    }
-
-    // ---- PASO 3: BOTÓN DE CALIBRAR ----
+    // ---- CALIBRAR ----
     function calibrar(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
 
-      if (ultimoContinuous === null) {
-        estadoCalib.textContent = "ESPERA, no llega lectura aún. ¿Pediste permiso?";
+      if (alphaAnterior === null) {
+        estadoCalib.textContent = "ESPERA, no llega lectura. ¿Pediste permiso?";
         boxCalib.classList.add("err");
         return;
       }
 
-      origen = ultimoContinuous;
+      origen = acumulado;
       origenEl.textContent = origen.toFixed(2);
       estadoCalib.textContent = "✓ CALIBRADO";
       boxCalib.classList.remove("err");
@@ -176,16 +183,6 @@
 
     btnCalibrar.addEventListener("touchstart", calibrar);
     btnCalibrar.addEventListener("click", calibrar);
-
-    // En navegadores que NO requieren permiso explícito (Android),
-    // arrancamos el sensor automáticamente al cargar.
-    if (typeof DeviceOrientationEvent === "undefined" ||
-        typeof DeviceOrientationEvent.requestPermission !== "function") {
-      iniciarSensor();
-      btnPermiso.style.display = "none";
-      estadoPermiso.textContent = "no requerido (auto-iniciado)";
-      boxPermiso.classList.add("ok");
-    }
   </script>
 
   <script src="config.js"></script>
