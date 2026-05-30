@@ -5,30 +5,72 @@
   <title>Slider óptico</title>
   <style>
     body {
-      margin: 0; height: 100vh;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      font-family: sans-serif; background: #f4f4f4;
-      gap: 40px;
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: sans-serif;
+      background: #f4f4f4;
+      gap: 34px;
     }
+
     #titulo {
       font-size: 2.5rem;
       font-weight: bold;
       color: #2a7;
       letter-spacing: 2px;
       text-transform: uppercase;
+      text-align: center;
     }
+
     #subtitulo {
       font-size: 1.2rem;
       color: #666;
-      margin-top: -30px;
+      margin-top: -24px;
+      text-align: center;
     }
+
     #salida {
       font-size: 16rem;
       font-weight: bold;
       color: #222;
-      line-height: 1;
+      line-height: 0.9;
+      transition: transform 0.18s ease;
     }
+
+    #escala {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      margin-top: -10px;
+    }
+
+    .paso {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      border: 4px solid #2a7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: #2a7;
+      background: white;
+      opacity: 0.35;
+      transition: opacity 0.2s, transform 0.2s, background 0.2s, color 0.2s;
+    }
+
+    .paso.activo {
+      opacity: 1;
+      transform: scale(1.18);
+      background: #2a7;
+      color: white;
+    }
+
     #ProtobjectPlusButton {
       width: auto !important;
       height: auto !important;
@@ -41,35 +83,69 @@
       bottom: auto !important;
       border-radius: 30px !important;
     }
+
     #ProtobjectPlusButton:after {
       content: " Conectar teléfono";
     }
   </style>
 </head>
+
 <body>
 
   <div id="titulo">Ejemplo 1 · Slider óptico</div>
   <div id="subtitulo">Desliza el cubo por el canal de 0 a 4</div>
+
   <div id="salida">—</div>
+
+  <div id="escala">
+    <div class="paso" data-n="0">0</div>
+    <div class="paso" data-n="1">1</div>
+    <div class="paso" data-n="2">2</div>
+    <div class="paso" data-n="3">3</div>
+    <div class="paso" data-n="4">4</div>
+  </div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
-    console.log("PC: registrando callback onReceived...");
+    const salida = document.getElementById("salida");
+    const subtitulo = document.getElementById("subtitulo");
+    const pasos = Array.from(document.querySelectorAll(".paso"));
 
     let primerMensajeRecibido = false;
 
-    Protobject.Core.onReceived((valor) => {
-      console.log("PC recibió:", valor);
-      document.getElementById("salida").textContent = valor;
+    function pintar(valor) {
+      salida.textContent = valor;
 
-      // La primera vez que recibimos algo, actualizamos el subtítulo
-      // para mostrar visualmente que la conexión está activa.
+      salida.style.transform = "scale(1.08)";
+      setTimeout(() => {
+        salida.style.transform = "scale(1)";
+      }, 150);
+
+      pasos.forEach((p) => {
+        p.classList.toggle("activo", Number(p.dataset.n) === valor);
+      });
+
       if (!primerMensajeRecibido) {
         primerMensajeRecibido = true;
-        document.getElementById("subtitulo").textContent = "✓ Teléfono conectado · desliza el cubo";
-        document.getElementById("subtitulo").style.color = "#2a7";
+        subtitulo.textContent = "✓ Teléfono conectado · desliza el cubo";
+        subtitulo.style.color = "#2a7";
       }
+    }
+
+    Protobject.Core.onReceived((mensaje) => {
+      // Soporta dos formatos:
+      // 1) número directo: 0, 1, 2, 3, 4
+      // 2) objeto: { valor: 0 }
+      const valor =
+        typeof mensaje === "object" && mensaje !== null
+          ? Number(mensaje.valor)
+          : Number(mensaje);
+
+      if (!Number.isFinite(valor)) return;
+      if (valor < 0 || valor > 4) return;
+
+      pintar(valor);
     });
   </script>
 

@@ -2,25 +2,174 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Sensor slider</title>
+
   <style>
-    body { font-family: sans-serif; padding: 20px; text-align: center; }
-    #instr { font-size: 22px; margin-top: 30px; }
-    #valor { font-size: 40px; margin-top: 20px; color: #2a7; }
+    body {
+      font-family: sans-serif;
+      padding: 18px;
+      margin: 0;
+      text-align: center;
+      background: #fafafa;
+      color: #222;
+    }
+
+    #instr {
+      font-size: 21px;
+      line-height: 1.35;
+      margin-top: 18px;
+      color: #333;
+    }
+
+    #valor {
+      font-size: 42px;
+      margin-top: 18px;
+      color: #2a7;
+      font-weight: bold;
+    }
+
+    #detalle {
+      font-size: 13px;
+      color: #666;
+      margin-top: 8px;
+      line-height: 1.35;
+      min-height: 36px;
+    }
+
+    #estado {
+      font-size: 14px;
+      color: #888;
+      margin-top: 8px;
+    }
+
+    button {
+      width: 100%;
+      border: none;
+      border-radius: 14px;
+      padding: 18px 14px;
+      margin-top: 14px;
+      font-size: 18px;
+      font-weight: bold;
+      background: #2a7;
+      color: white;
+      touch-action: manipulation;
+    }
+
+    button.secundario {
+      background: #e5e7eb;
+      color: #333;
+      font-size: 15px;
+      padding: 13px;
+    }
+
+    button.done {
+      background: #94d2bd;
+      color: #064e3b;
+    }
+
+    #barra {
+      width: 100%;
+      height: 28px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 18px;
+    }
+
+    #fill {
+      width: 0%;
+      height: 100%;
+      background: #2a7;
+      border-radius: 999px;
+      transition: width 0.18s linear;
+    }
   </style>
 </head>
+
 <body>
-  <div id="instr">Apunta la cámara al canal.<br>Pon el cubo en el EXTREMO IZQUIERDO y toca aquí.</div>
+
+  <div id="instr">
+    Pon el cubo en el extremo 0 del canal y toca calibrar.
+  </div>
+
   <div id="valor">—</div>
+
+  <div id="barra">
+    <div id="fill"></div>
+  </div>
+
+  <button id="btnCalibrar">Calibrar extremo 0</button>
+  <button id="btnReiniciar" class="secundario">Reiniciar calibración</button>
+
+  <div id="detalle">Buscando cubo ArUco...</div>
+  <div id="estado">Lecturas: 0</div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
     const instr = document.getElementById("instr");
     const valorEl = document.getElementById("valor");
+    const detalle = document.getElementById("detalle");
+    const estadoEl = document.getElementById("estado");
+    const btnCalibrar = document.getElementById("btnCalibrar");
+    const btnReiniciar = document.getElementById("btnReiniciar");
+    const fill = document.getElementById("fill");
 
-    // ---- FORZAR CÁMARA TRASERA EN iPhone ----
+    // -----------------------------
+    // Parámetros de estabilidad
+    // -----------------------------
+    const LECTURAS_MEDIANA = 5;
+    const LECTURAS_ESTABLES_PARA_CAMBIAR = 2;
+    const INTERVALO_SALIDA_MS = 160;
+
+    let lecturas = 0;
+    let ultimaLectura = null;
+    let historial = [];
+
+    let punto0 = null;
+    let punto4 = null;
+    let eje = null;
+    let etapa = "calibrar0";
+
+    let binActual = null;
+    let binObjetivo = null;
+    let binCandidato = null;
+    let contadorCandidato = 0;
+
+    // -----------------------------
+    // Cámara / ArUco
+    // -----------------------------
+    Protobject.Aruco.onData((data) => {
+      const punto = obtenerPuntoDelCubo(data);
+
+      if (!punto) {
+        detalle.textContent = "No veo el cubo. Acércalo, mejora la luz o revisa que el marcador mire a la cámara.";
+        return;
+      }
+
+      lecturas++;
+      estadoEl.textContent = "Lecturas: " + lecturas;
+
+      historial.push(punto);
+      if (historial.length > LECTURAS_MEDIANA) {
+        historial.shift();
+      }
+
+      ultimaLectura = puntoMediano(historial);
+
+      if (etapa !== "listo") {
+        valorEl.textContent = "•";
+        detalle.textContent =
+          "Cubo detectado · x=" + Math.round(ultimaLectura.x) +
+          " · y=" + Math.round(ultimaLectura.y) +
+          " · marcadores=" + punto.cantidad;
+        return;
+      }
+
+      actualizarSlider(ultimaLectura);
+    });
+
     async function elegirYIniciar() {
       try {
         const tmp = await navigator.mediaDevices.getUserMedia({
@@ -30,92 +179,243 @@
 
         const devices = await navigator.mediaDevices.enumerateDevices();
         const camaras = devices.filter(d => d.kind === "videoinput");
-        console.log("Cámaras encontradas:", camaras);
 
         let idxTrasera = 0;
         for (let i = 0; i < camaras.length; i++) {
           const nombre = camaras[i].label.toLowerCase();
-          if (nombre.includes("back") || nombre.includes("posterior") ||
-              nombre.includes("rear") || nombre.includes("trasera")) {
+          if (
+            nombre.includes("back") ||
+            nombre.includes("posterior") ||
+            nombre.includes("rear") ||
+            nombre.includes("trasera")
+          ) {
             idxTrasera = i;
             break;
           }
         }
-        console.log("Usando cámara índice:", idxTrasera, camaras[idxTrasera]?.label);
 
-        Protobject.Aruco.start(100, idxTrasera);
+        Protobject.Aruco.start(80, idxTrasera);
       } catch (err) {
-        console.warn("Falló elección de cámara, uso 0 por defecto:", err);
-        Protobject.Aruco.start(100, 0);
+        console.warn("No pude forzar cámara trasera. Uso cámara 0.", err);
+        Protobject.Aruco.start(80, 0);
       }
 
-      Protobject.Aruco.showPreview({ top: 200, left: 10, width: 320, height: 240 });
+      // Vista previa suficientemente grande para alinear el cubo.
+      Protobject.Aruco.showPreview({
+        top: 260,
+        left: 10,
+        width: 340,
+        height: 255
+      });
     }
+
     elegirYIniciar();
 
-    // ---- ESTADO DE CALIBRACIÓN ----
-    let xMin = null;
-    let xMax = null;
-    let etapa = "izq";
-    let ultimaX = null;
-    let binAnterior = null;
+    // -----------------------------
+    // Detección robusta del cubo
+    // -----------------------------
+    function obtenerPuntoDelCubo(data) {
+      if (!data) return null;
 
-    // ---- LECTURA DE MARCADORES ----
-    // Tomamos el marcador más grande (la cara más cercana a la cámara).
-    // Así el slider funciona con cualquier cara del cubo.
-    Protobject.Aruco.onData((data) => {
       const ids = Object.keys(data);
-      if (ids.length === 0) return;
+      if (ids.length === 0) return null;
 
-      let mejorId = ids[0];
+      let sumaX = 0;
+      let sumaY = 0;
+      let sumaPesos = 0;
+      let cantidad = 0;
+
       for (const id of ids) {
-        if (data[id].size > data[mejorId].size) mejorId = id;
+        const m = data[id];
+
+        if (
+          !m ||
+          !m.position ||
+          typeof m.position.x !== "number" ||
+          typeof m.position.y !== "number"
+        ) {
+          continue;
+        }
+
+        // Si se ven varias caras del cubo, promediamos ponderando por tamaño.
+        // Esto evita saltos cuando ArUco cambia de una cara visible a otra.
+        const peso = Math.max(1, Number(m.size) || 1);
+
+        sumaX += m.position.x * peso;
+        sumaY += m.position.y * peso;
+        sumaPesos += peso;
+        cantidad++;
       }
 
-      // Con el teléfono horizontal el canal corre a lo largo del eje Y
-      ultimaX = data[mejorId].position.y;
+      if (cantidad === 0 || sumaPesos === 0) return null;
 
-      if (etapa !== "listo") {
-        valorEl.textContent = "y: " + Math.round(ultimaX);
+      return {
+        x: sumaX / sumaPesos,
+        y: sumaY / sumaPesos,
+        cantidad: cantidad
+      };
+    }
+
+    function puntoMediano(lista) {
+      const xs = lista.map(p => p.x).sort((a, b) => a - b);
+      const ys = lista.map(p => p.y).sort((a, b) => a - b);
+      const i = Math.floor(lista.length / 2);
+
+      return {
+        x: xs[i],
+        y: ys[i],
+        cantidad: lista[lista.length - 1].cantidad
+      };
+    }
+
+    // -----------------------------
+    // Calibración
+    // -----------------------------
+    btnCalibrar.addEventListener("click", calibrar);
+    btnCalibrar.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      calibrar();
+    });
+
+    btnReiniciar.addEventListener("click", reiniciar);
+    btnReiniciar.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      reiniciar();
+    });
+
+    function calibrar() {
+      if (!ultimaLectura) {
+        instr.textContent = "Aún no veo el cubo. Apunta bien la cámara y vuelve a tocar.";
         return;
       }
 
-      // Normalizar al rango calibrado [0, 1]
-      let t = (ultimaX - xMin) / (xMax - xMin);
+      if (etapa === "calibrar0") {
+        punto0 = { x: ultimaLectura.x, y: ultimaLectura.y };
+        etapa = "calibrar4";
+
+        instr.textContent = "Ahora pon el cubo en el extremo 4 y toca calibrar.";
+        btnCalibrar.textContent = "Calibrar extremo 4";
+        btnCalibrar.classList.add("done");
+
+        return;
+      }
+
+      if (etapa === "calibrar4") {
+        punto4 = { x: ultimaLectura.x, y: ultimaLectura.y };
+
+        const dx = Math.abs(punto4.x - punto0.x);
+        const dy = Math.abs(punto4.y - punto0.y);
+
+        eje = dx >= dy ? "x" : "y";
+
+        if (Math.max(dx, dy) < 40) {
+          instr.textContent = "Los extremos quedaron muy cerca. Usa un canal más largo o recalibra.";
+          return;
+        }
+
+        etapa = "listo";
+        btnCalibrar.textContent = "✓ Calibrado";
+        btnCalibrar.classList.add("done");
+
+        instr.textContent = "Listo. Desliza el cubo lentamente por el canal.";
+        detalle.textContent = "Eje usado: " + eje.toUpperCase() + " · salida gradual sin saltos.";
+
+        // Inicializar el valor actual en la posición en que quedó el cubo.
+        actualizarSlider(ultimaLectura, true);
+
+        return;
+      }
+    }
+
+    function reiniciar() {
+      punto0 = null;
+      punto4 = null;
+      eje = null;
+      etapa = "calibrar0";
+
+      binActual = null;
+      binObjetivo = null;
+      binCandidato = null;
+      contadorCandidato = 0;
+
+      btnCalibrar.textContent = "Calibrar extremo 0";
+      btnCalibrar.classList.remove("done");
+
+      valorEl.textContent = "—";
+      fill.style.width = "0%";
+      instr.textContent = "Pon el cubo en el extremo 0 del canal y toca calibrar.";
+      detalle.textContent = "Buscando cubo ArUco...";
+    }
+
+    // -----------------------------
+    // Mapeo 0–4 y salida gradual
+    // -----------------------------
+    function actualizarSlider(punto, iniciarSinAnimacion = false) {
+      const inicio = punto0[eje];
+      const fin = punto4[eje];
+      const actual = punto[eje];
+
+      let t = (actual - inicio) / (fin - inicio);
       t = Math.max(0, Math.min(1, t));
 
-      // Mapear a 5 casillas discretas: 0, 1, 2, 3, 4
-      const bin = Math.min(4, Math.floor(t * 5));
+      // Cinco zonas: 0, 1, 2, 3, 4.
+      let binCrudo = Math.floor(t * 5);
+      binCrudo = Math.max(0, Math.min(4, binCrudo));
 
-      // Mostrar en el teléfono lo que estamos calculando (depuración)
-      valorEl.textContent = "bin: " + bin + " (t=" + t.toFixed(2) + ")";
+      fill.style.width = (t * 100).toFixed(1) + "%";
 
-      // Enviar SOLO cuando cambia la casilla: ese es el evento semántico.
-      if (bin !== binAnterior) {
-        binAnterior = bin;
-        Protobject.Core.send(bin).to("index.html");
-        console.log("Teléfono envió al PC:", bin);
+      // Pequeño filtro de estabilidad para que no tiemble entre dos casillas.
+      if (binCrudo === binCandidato) {
+        contadorCandidato++;
+      } else {
+        binCandidato = binCrudo;
+        contadorCandidato = 1;
       }
-    });
 
-    // ---- CALIBRACIÓN POR TOQUE ----
-    document.body.addEventListener("click", () => {
-      if (ultimaX === null) {
-        instr.textContent = "Aún no veo el cubo. Apunta bien la cámara.";
+      if (contadorCandidato >= LECTURAS_ESTABLES_PARA_CAMBIAR) {
+        binObjetivo = binCrudo;
+      }
+
+      detalle.textContent =
+        "t=" + t.toFixed(2) +
+        " · objetivo=" + binCrudo +
+        " · eje=" + eje.toUpperCase();
+
+      if (iniciarSinAnimacion && binObjetivo !== null) {
+        binActual = binObjetivo;
+        enviarValor(binActual);
+      }
+    }
+
+    setInterval(() => {
+      if (etapa !== "listo") return;
+      if (binObjetivo === null) return;
+
+      if (binActual === null) {
+        binActual = binObjetivo;
+        enviarValor(binActual);
         return;
       }
-      if (etapa === "izq") {
-        xMin = ultimaX;
-        etapa = "der";
-        instr.textContent = "Ahora ponlo al EXTREMO DERECHO y toca aquí.";
-      } else if (etapa === "der") {
-        xMax = ultimaX;
-        etapa = "listo";
-        instr.textContent = "¡Listo! Desliza el cubo por el canal.";
+
+      if (binActual < binObjetivo) {
+        binActual++;
+        enviarValor(binActual);
+      } else if (binActual > binObjetivo) {
+        binActual--;
+        enviarValor(binActual);
       }
-    });
+    }, INTERVALO_SALIDA_MS);
+
+    function enviarValor(valor) {
+      valorEl.textContent = valor;
+
+      Protobject.Core.send(valor).to("index.html");
+
+      console.log("Slider envió:", valor);
+    }
   </script>
 
   <script src="config.js"></script>
+
 </body>
 </html>
