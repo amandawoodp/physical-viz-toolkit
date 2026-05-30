@@ -2,14 +2,15 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Panel con agujeros</title>
+  <title>Panel táctil</title>
+
   <style>
     :root {
-      --bg: #f6f1e8;
-      --ink: #1f2937;
+      --green: #20a86b;
+      --red: #f03b49;
+      --text: #2b2b2b;
       --muted: #6b7280;
-      --card: #fffaf0;
-      --line: rgba(31, 41, 55, 0.14);
+      --bg: #f7f7f7;
     }
 
     * {
@@ -20,23 +21,15 @@
       margin: 0;
       min-height: 100vh;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(255,255,255,0.9), transparent 28rem),
-        var(--bg);
-      color: var(--ink);
-      display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
-      gap: 28px;
-      padding: 38px;
-      transition: background 0.35s ease, color 0.35s ease;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 22px;
     }
-
-    body.agua { --bg: #e0f2fe; --card: #f0f9ff; }
-    body.energia { --bg: #fef3c7; --card: #fff7ed; }
-    body.transporte { --bg: #e5e7eb; --card: #f9fafb; }
-    body.residuos { --bg: #dcfce7; --card: #f0fdf4; }
-    body.verde { --bg: #d9f99d; --card: #f7fee7; }
-    body.poblacion { --bg: #ede9fe; --card: #faf5ff; }
 
     #ProtobjectPlusButton {
       width: auto !important;
@@ -49,324 +42,148 @@
       right: auto !important;
       bottom: auto !important;
       border-radius: 30px !important;
-      z-index: 50 !important;
+      z-index: 10 !important;
     }
 
     #ProtobjectPlusButton:after {
       content: " Conectar tablet";
     }
 
-    .hero {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      min-width: 0;
-    }
-
-    .eyebrow {
-      text-transform: uppercase;
-      letter-spacing: 0.18em;
-      font-size: 0.82rem;
-      font-weight: 800;
-      color: var(--muted);
-      margin-bottom: 18px;
-    }
-
     h1 {
       margin: 0;
-      font-size: clamp(2.6rem, 7vw, 6.4rem);
-      line-height: 0.92;
-      letter-spacing: -0.06em;
-    }
-
-    #descripcion {
-      margin-top: 22px;
-      max-width: 720px;
-      font-size: clamp(1.2rem, 2vw, 1.8rem);
-      line-height: 1.35;
-      color: #374151;
-    }
-
-    .big-icon {
-      font-size: clamp(8rem, 20vw, 16rem);
+      font-size: clamp(2.4rem, 5vw, 4.8rem);
       line-height: 1;
-      margin-top: 36px;
-      filter: drop-shadow(0 20px 30px rgba(0,0,0,0.12));
-      transition: transform 0.25s ease;
-    }
-
-    .big-icon.pop {
-      transform: scale(1.08) rotate(-3deg);
-    }
-
-    .panel {
-      align-self: center;
-      background: rgba(255,255,255,0.6);
-      border: 1px solid var(--line);
-      border-radius: 34px;
-      padding: 28px;
-      box-shadow: 0 24px 70px rgba(31,41,55,0.12);
-      backdrop-filter: blur(12px);
-    }
-
-    .status {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 26px;
-      padding: 24px;
-      margin-bottom: 18px;
-    }
-
-    .status-label {
-      font-size: 0.85rem;
-      color: var(--muted);
-      text-transform: uppercase;
       letter-spacing: 0.12em;
-      font-weight: 800;
+      color: var(--green);
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    #subtitulo {
+      margin-top: -8px;
+      font-size: clamp(1rem, 1.8vw, 1.45rem);
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .display {
+      width: min(44vw, 390px);
+      height: min(44vw, 390px);
+      min-width: 260px;
+      min-height: 260px;
+      border: 7px solid var(--green);
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      box-shadow: 0 25px 70px rgba(0,0,0,0.08);
+      transition: transform 0.18s ease;
+    }
+
+    .display.pop {
+      transform: scale(1.035);
+    }
+
+    #numero {
+      font-size: clamp(7rem, 18vw, 13rem);
+      line-height: 1;
+      font-weight: 900;
+      color: var(--text);
+      letter-spacing: -0.05em;
+    }
+
+    .selector {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .mini {
+      width: 52px;
+      height: 52px;
+      border-radius: 999px;
+      border: 3px solid #d1d5db;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 1.35rem;
+      color: #9ca3af;
+      background: white;
+      transition: all 0.18s ease;
+    }
+
+    .mini.active {
+      border-color: var(--red);
+      color: var(--red);
+      transform: translateY(-3px);
     }
 
     #estado {
-      margin-top: 10px;
-      font-size: 2.5rem;
-      font-weight: 900;
-      letter-spacing: -0.04em;
-    }
-
-    .meter {
-      margin-top: 20px;
-    }
-
-    .meter-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 12px;
-      font-size: 0.95rem;
+      font-size: 1.15rem;
       color: var(--muted);
-      margin-bottom: 8px;
+      min-height: 1.4em;
     }
 
-    #valor {
-      font-weight: 900;
-      color: var(--ink);
-      font-size: 1.25rem;
-    }
-
-    .bar {
-      height: 22px;
-      background: rgba(17,24,39,0.1);
-      border-radius: 999px;
-      overflow: hidden;
-    }
-
-    #barFill {
-      width: 0%;
-      height: 100%;
-      border-radius: 999px;
-      background: currentColor;
-      transition: width 0.35s ease;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-      margin-top: 18px;
-    }
-
-    .chip {
-      padding: 14px;
-      border-radius: 18px;
-      background: rgba(255,255,255,0.48);
-      border: 1px solid var(--line);
-      color: var(--muted);
-      font-weight: 700;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      opacity: 0.7;
-    }
-
-    .chip.active {
-      color: var(--ink);
-      background: var(--card);
-      opacity: 1;
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(31,41,55,0.08);
-    }
-
-    .history {
-      margin-top: 18px;
-      font-size: 0.95rem;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    .history strong {
-      color: var(--ink);
-    }
-
-    @media (max-width: 900px) {
+    @media (max-width: 700px) {
       body {
-        grid-template-columns: 1fr;
-        padding: 26px;
+        padding: 22px;
       }
 
-      .big-icon {
-        margin-top: 18px;
+      .selector {
+        grid-template-columns: repeat(3, 1fr);
       }
     }
   </style>
 </head>
 
 <body>
-  <main class="hero">
-    <div class="eyebrow">Ejemplo 08 · Panel con agujeros</div>
-    <h1 id="titulo">Toca una zona del panel</h1>
-    <div id="descripcion">
-      Coloca la lámina de cartón sobre la tablet y toca a través de los agujeros.
-      La selección aparecerá aquí como una visualización simple.
-    </div>
-    <div id="icono" class="big-icon">▦</div>
+  <h1>Ejemplo 8 · Panel táctil</h1>
+  <div id="subtitulo">Toca un número en la tablet</div>
+
+  <main class="display" id="display">
+    <div id="numero">—</div>
   </main>
 
-  <aside class="panel">
-    <section class="status">
-      <div class="status-label">Selección actual</div>
-      <div id="estado">Esperando panel</div>
+  <section class="selector" aria-label="Números disponibles">
+    <div class="mini" data-num="1">1</div>
+    <div class="mini" data-num="2">2</div>
+    <div class="mini" data-num="3">3</div>
+    <div class="mini" data-num="4">4</div>
+    <div class="mini" data-num="5">5</div>
+    <div class="mini" data-num="6">6</div>
+  </section>
 
-      <div class="meter">
-        <div class="meter-top">
-          <span>Valor de ejemplo</span>
-          <span id="valor">—</span>
-        </div>
-        <div class="bar">
-          <div id="barFill"></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="grid" id="chips"></section>
-
-    <section class="history" id="historial">
-      Conecta la tablet desde el botón superior izquierdo.
-    </section>
-  </aside>
+  <div id="estado">—</div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
-    const OPCIONES = {
-      agua: {
-        id: "agua",
-        label: "Agua",
-        emoji: "💧",
-        valor: 78,
-        descripcion: "Indicadores asociados a consumo, disponibilidad y cuidado del agua."
-      },
-      energia: {
-        id: "energia",
-        label: "Energía",
-        emoji: "⚡",
-        valor: 64,
-        descripcion: "Consumo energético, fuentes renovables y eficiencia."
-      },
-      transporte: {
-        id: "transporte",
-        label: "Transporte",
-        emoji: "🚌",
-        valor: 52,
-        descripcion: "Movilidad urbana, tiempos de traslado y modos de transporte."
-      },
-      residuos: {
-        id: "residuos",
-        label: "Residuos",
-        emoji: "♻️",
-        valor: 43,
-        descripcion: "Generación, reciclaje y gestión de residuos."
-      },
-      verde: {
-        id: "verde",
-        label: "Áreas verdes",
-        emoji: "🌿",
-        valor: 71,
-        descripcion: "Superficie verde, acceso a parques y biodiversidad urbana."
-      },
-      poblacion: {
-        id: "poblacion",
-        label: "Población",
-        emoji: "👥",
-        valor: 89,
-        descripcion: "Densidad, crecimiento y distribución de habitantes."
-      }
-    };
-
-    const chipsEl = document.getElementById("chips");
-    const tituloEl = document.getElementById("titulo");
-    const descripcionEl = document.getElementById("descripcion");
-    const iconoEl = document.getElementById("icono");
+    const numeroEl = document.getElementById("numero");
     const estadoEl = document.getElementById("estado");
-    const valorEl = document.getElementById("valor");
-    const barFillEl = document.getElementById("barFill");
-    const historialEl = document.getElementById("historial");
+    const displayEl = document.getElementById("display");
+    const minis = Array.from(document.querySelectorAll(".mini"));
 
-    const historial = [];
+    function mostrarNumero(num) {
+      if (!num) return;
 
-    function crearChips() {
-      chipsEl.innerHTML = Object.values(OPCIONES).map(opcion => `
-        <div class="chip" data-id="${opcion.id}">
-          <span>${opcion.emoji}</span>
-          <span>${opcion.label}</span>
-        </div>
-      `).join("");
-    }
+      numeroEl.textContent = num;
+      estadoEl.textContent = "Seleccionado: " + num;
 
-    function activarChip(id) {
-      document.querySelectorAll(".chip").forEach(chip => {
-        chip.classList.toggle("active", chip.dataset.id === id);
+      minis.forEach((el) => {
+        el.classList.toggle("active", el.dataset.num === String(num));
       });
+
+      displayEl.classList.remove("pop");
+      void displayEl.offsetWidth;
+      displayEl.classList.add("pop");
     }
-
-    function actualizarPantalla(datos) {
-      const opcion = OPCIONES[datos.id] || datos;
-      if (!opcion || !opcion.id) return;
-
-      document.body.classList.remove("agua", "energia", "transporte", "residuos", "verde", "poblacion");
-      document.body.classList.add(opcion.id);
-
-      tituloEl.textContent = opcion.label;
-      descripcionEl.textContent = opcion.descripcion || "Zona seleccionada desde el panel físico.";
-      iconoEl.textContent = opcion.emoji || "●";
-      estadoEl.textContent = opcion.label;
-      valorEl.textContent = Math.round(opcion.valor || 0) + "%";
-      barFillEl.style.width = Math.max(0, Math.min(100, opcion.valor || 0)) + "%";
-
-      iconoEl.classList.add("pop");
-      setTimeout(() => iconoEl.classList.remove("pop"), 220);
-
-      activarChip(opcion.id);
-
-      historial.unshift(opcion.label);
-      if (historial.length > 5) historial.pop();
-
-      historialEl.innerHTML =
-        "<strong>Últimos toques:</strong> " + historial.join(" · ");
-    }
-
-    crearChips();
 
     Protobject.Core.onReceived((datos) => {
-      if (!datos || datos.tipo !== "panel") return;
-      actualizarPantalla(datos);
-    });
-
-    // Permite probar la pantalla sin tablet, usando teclas 1–6.
-    window.addEventListener("keydown", (e) => {
-      const ids = Object.keys(OPCIONES);
-      const index = Number(e.key) - 1;
-      if (index >= 0 && index < ids.length) {
-        actualizarPantalla(OPCIONES[ids[index]]);
-      }
+      if (!datos) return;
+      mostrarNumero(datos.numero || datos.marcador || datos.valor);
     });
   </script>
 
