@@ -8,15 +8,15 @@ El usuario gira el teléfono sobre la mesa como si fuera una perilla. La pantall
 - Computador con navegador Chrome o Safari
 - Disco de cartón de ~15 cm de diámetro (o plato de papel / tapa grande de frasco)
 - Base B — Cuna con elásticos (para fijar el teléfono al centro del disco)
-- Mondadientes (eje central improvisado)
+- Eje central (hecho en LEGO Technic, pero puede utilizarse cualquier elemento que rote)
 
 ## Cómo usar
 
 1. Abre [la demo en vivo](https://amandawoodp.github.io/physical-viz-toolkit/artefactos/02-perilla/) en el computador.
 2. Click en "+ Conectar teléfono". Aparece un código QR.
 3. Escanea el QR con el iPhone/Android.
-4. **Permiso de orientación**: en algunos iPhones aparece un cuadro adicional pidiendo acceso a "Movimiento y orientación". Concédelo. Si no aparece y los valores no se mueven, ve a Ajustes → Safari → Movimiento y orientación → permitir.
-5. Fija el teléfono al centro del disco con la Base B, dejando un mondadientes clavado como eje central debajo (sin tocar el teléfono).
+4. **Permiso de orientación (iOS)**: aparecerá un botón rojo "PEDIR PERMISO DE ORIENTACIÓN". Tócalo y permite el acceso cuando iOS lo solicite. Sin este permiso el sensor no entrega datos.
+5. Fija el teléfono al centro del disco con la Base B, sobre el eje rotatorio.
 6. Pon el conjunto plano sobre la mesa, en la posición inicial deseada.
 7. Toca **"Calibrar como posición 0"** en el teléfono.
 8. Gira el disco sujetándolo por los bordes. En el PC:
@@ -24,15 +24,19 @@ El usuario gira el teléfono sobre la mesa como si fuera una perilla. La pantall
    - El ángulo numérico crece o decrece según el sentido.
    - Aparece "↻ Horario" o "↺ Antihorario" con el número de vueltas completas.
 
-## Componente Protobject
+## Sensor utilizado
 
-`Protobject.Orientation` — accede al magnetómetro y giroscopio del teléfono. Usamos específicamente el valor `horizontalContinuous`, que **no se reinicia al cruzar 360°**: si das dos vueltas en sentido horario, el valor llega a 720; si giras en antihorario, llega a valores negativos. Esto permite rotación libre en ambos sentidos sin saltos visuales.
+El artefacto lee el sensor de orientación del teléfono a través de la API estándar `deviceorientation` del navegador, específicamente el valor `alpha` (rotación sobre el eje vertical, equivalente a una brújula).
+
+Sobre esa lectura cruda el código construye un **ángulo continuo acumulado** que no se reinicia al cruzar 360°: si das dos vueltas en sentido horario, el valor llega a 720°; si giras en antihorario, llega a valores negativos. Esto permite rotación libre en ambos sentidos sin saltos visuales.
+
+> **Nota sobre Protobject.Orientation**: el framework expone un componente `Orientation` con un valor `horizontalContinuous` ideal para este uso. En la práctica, en iOS 13+ la concesión de permiso de movimiento debe ocurrir desde un toque del usuario, y la inicialización de `Protobject.Orientation` antes del permiso no se recuperaba después. Por eso este artefacto utiliza directamente la API del navegador, que sí responde tras la concesión del permiso. El envío al PC sigue usando `Protobject.Core.send`.
 
 ## Sensor y mapeo de datos
 
-`Orientation.horizontalContinuous` (ángulo absoluto sin saltos) → diferencia con el origen calibrado → ángulo relativo + número de vueltas → objeto `{ angulo, vueltas }` enviado al PC → flecha rotando + número + sentido.
+`event.alpha` del DOM → acumulación de deltas para construir ángulo continuo → inversión de signo (para que horario físico = horario en pantalla) → diferencia con el origen calibrado → objeto `{ angulo, vueltas }` enviado al PC → flecha rotando + número + sentido.
 
-El código aplica un **filtro de ruido**: solo envía cambios superiores a 1° desde el último envío, para evitar saturar con micro-vibraciones del sensor.
+El estudiante final nunca ve la lectura cruda del sensor: solo recibe un evento semántico con el ángulo ya procesado y las vueltas completas acumuladas.
 
 ## Usos típicos
 
@@ -44,6 +48,7 @@ El código aplica un **filtro de ruido**: solo envía cambios superiores a 1° d
 ## Notas
 
 - Requiere calibración de un solo toque cada vez que se monta o se reorienta el sistema.
+- En iPhone es obligatorio tocar el botón "PEDIR PERMISO DE ORIENTACIÓN" antes de calibrar; sin permiso el sensor no entrega lecturas.
 - El sensor de orientación es **menos preciso cerca de objetos metálicos grandes** (laptops, parlantes, monitores). Si los grados se mueven solos sin que toques el teléfono, aleja el conjunto de fuentes magnéticas.
 - Variante vertical (montaje en pared): requiere una solución mecánica adicional para que el teléfono no caiga por gravedad (doble círculo concéntrico de cartón, eje largo de LEGO Technic, etc).
 - El teléfono y el computador deben estar en la misma red WiFi.

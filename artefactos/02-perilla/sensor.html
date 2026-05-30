@@ -7,91 +7,73 @@
   <style>
     * { box-sizing: border-box; }
     body {
-      font-family: monospace; padding: 15px; margin: 0;
-      background: #fafafa; font-size: 16px;
+      font-family: sans-serif; padding: 20px; margin: 0;
+      background: #fafafa; text-align: center;
     }
-    h2 { margin-top: 10px; font-size: 18px; }
-    .box {
-      background: white; border: 2px solid #ddd; border-radius: 8px;
-      padding: 12px; margin: 10px 0;
+    #instr {
+      font-size: 22px; margin-top: 20px; color: #333;
     }
-    .box.ok { border-color: #2a7; background: #eef9f3; }
-    .box.err { border-color: #c44; background: #fdeeee; }
-    #calibrar {
-      display: block; width: 100%; padding: 25px;
-      font-size: 22px; font-weight: bold;
-      background: #2a7; color: white; border: none; border-radius: 14px;
+    #valor {
+      font-size: 64px; margin: 30px 0; color: #2a7; font-weight: bold;
+    }
+    button {
+      display: block; width: 100%;
+      font-weight: bold;
+      border: none; border-radius: 14px;
       margin: 15px 0;
       touch-action: manipulation;
+      cursor: pointer;
+    }
+    #permiso {
+      padding: 18px; font-size: 18px;
+      background: #e63946; color: white;
+    }
+    #calibrar {
+      padding: 25px; font-size: 22px;
+      background: #2a7; color: white;
     }
     #calibrar:active { background: #1a5; }
-    #permiso {
-      display: block; width: 100%; padding: 18px;
-      font-size: 18px; font-weight: bold;
-      background: #e63946; color: white; border: none; border-radius: 14px;
-      margin: 15px 0;
-    }
-    .pequeno { font-size: 13px; color: #666; }
   </style>
 </head>
 <body>
 
-  <h2>🔍 Diagnóstico de la perilla v2</h2>
+  <button id="permiso">PEDIR PERMISO DE ORIENTACIÓN</button>
 
-  <button id="permiso">PEDIR PERMISO DE ORIENTACIÓN (iOS)</button>
+  <div id="instr">Pon el teléfono plano sobre la mesa.</div>
 
-  <div class="box" id="boxPermiso">
-    <strong>Permiso iOS:</strong> <span id="estadoPermiso">no solicitado</span>
-  </div>
+  <button id="calibrar" style="display:none">📍 CALIBRAR COMO POSICIÓN 0</button>
 
-  <div class="box" id="boxLectura">
-    <strong>Lecturas:</strong> <span id="contadorLecturas">0</span><br>
-    <span class="pequeno">alpha (crudo):</span> <span id="alpha">—</span><br>
-    <span class="pequeno">acumulado invertido:</span> <span id="hcont">—</span>
-  </div>
-
-  <button id="calibrar">📍 CALIBRAR COMO POSICIÓN 0</button>
-
-  <div class="box" id="boxCalib">
-    <strong>Estado:</strong> <span id="estadoCalib">sin calibrar</span><br>
-    <span class="pequeno">Ángulo relativo:</span> <span id="rel">—</span>
-  </div>
+  <div id="valor">—</div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
-    const estadoPermiso = document.getElementById("estadoPermiso");
-    const boxPermiso = document.getElementById("boxPermiso");
-    const contadorLecturas = document.getElementById("contadorLecturas");
-    const alphaEl = document.getElementById("alpha");
-    const hcontEl = document.getElementById("hcont");
-    const boxLectura = document.getElementById("boxLectura");
-    const estadoCalib = document.getElementById("estadoCalib");
-    const relEl = document.getElementById("rel");
-    const boxCalib = document.getElementById("boxCalib");
+    const instr = document.getElementById("instr");
+    const valorEl = document.getElementById("valor");
     const btnCalibrar = document.getElementById("calibrar");
     const btnPermiso = document.getElementById("permiso");
 
-    // INVERTIR SENTIDO: para que girar el teléfono en horario
-    // corresponda a la flecha girando en horario en el PC.
-    // Si quieres invertir al revés, cambia este 1 por -1.
+    // SENTIDO de la rotación. -1 hace que girar el teléfono en horario
+    // corresponda a la flecha del PC también en horario.
     const SENTIDO = -1;
 
-    let lecturas = 0;
+    // Filtro de ruido: solo enviar al PC cambios > este umbral.
+    const UMBRAL_GRADOS = 1;
+
     let origen = null;
     let acumulado = 0;
     let alphaAnterior = null;
+    let anguloPrevio = null;
 
+    // ---- LISTENER DEL SENSOR DE ORIENTACIÓN ----
+    // Usamos la API nativa 'deviceorientation' del navegador.
+    // 'alpha' es el ángulo de brújula (0-360°). Como se reinicia al
+    // cruzar 360°, lo acumulamos manualmente para conseguir un valor
+    // continuo en ambos sentidos.
     function handler(event) {
-      lecturas++;
-      contadorLecturas.textContent = lecturas;
-
       const alpha = event.alpha;
-      alphaEl.textContent = alpha !== null ? alpha.toFixed(2) : "null";
-
       if (alpha === null) return;
 
-      // Acumular delta sin saltos en 360° → 0°, multiplicado por SENTIDO
       if (alphaAnterior !== null) {
         let delta = alpha - alphaAnterior;
         if (delta > 180) delta -= 360;
@@ -99,59 +81,76 @@
         acumulado += delta * SENTIDO;
       }
       alphaAnterior = alpha;
-      hcontEl.textContent = acumulado.toFixed(2);
-      boxLectura.classList.add("ok");
 
-      if (origen !== null) {
-        const angulo = acumulado - origen;
-        const vueltas = Math.trunc(angulo / 360);
-        relEl.textContent = angulo.toFixed(2) + "°";
-        Protobject.Core.send({ angulo: angulo, vueltas: vueltas }).to("index.html");
+      // Mostrar localmente el ángulo crudo o el relativo
+      if (origen === null) {
+        valorEl.textContent = "—";
+        return;
       }
+
+      const angulo = acumulado - origen;
+      const vueltas = Math.trunc(angulo / 360);
+
+      valorEl.textContent = Math.round(angulo) + "°";
+
+      // Filtro: solo enviar si cambió suficientemente
+      if (anguloPrevio !== null && Math.abs(angulo - anguloPrevio) < UMBRAL_GRADOS) {
+        return;
+      }
+      anguloPrevio = angulo;
+
+      Protobject.Core.send({ angulo: angulo, vueltas: vueltas }).to("index.html");
     }
 
+    // ---- PEDIR PERMISO DE iOS Y EMPEZAR ----
     btnPermiso.addEventListener("click", async () => {
       try {
         if (typeof DeviceOrientationEvent !== "undefined" &&
             typeof DeviceOrientationEvent.requestPermission === "function") {
           const respuesta = await DeviceOrientationEvent.requestPermission();
-          estadoPermiso.textContent = respuesta;
-          boxPermiso.classList.add(respuesta === "granted" ? "ok" : "err");
           if (respuesta === "granted") {
-            btnPermiso.style.display = "none";
-            window.addEventListener("deviceorientationabsolute", handler, true);
-            window.addEventListener("deviceorientation", handler, true);
+            iniciar();
+          } else {
+            instr.textContent = "Permiso denegado. Recarga la página para reintentar.";
           }
         } else {
-          estadoPermiso.textContent = "no requerido";
-          boxPermiso.classList.add("ok");
-          btnPermiso.style.display = "none";
-          window.addEventListener("deviceorientationabsolute", handler, true);
-          window.addEventListener("deviceorientation", handler, true);
+          iniciar();
         }
       } catch (err) {
-        estadoPermiso.textContent = "ERROR: " + err.message;
-        boxPermiso.classList.add("err");
+        instr.textContent = "Error: " + err.message;
       }
     });
 
+    function iniciar() {
+      btnPermiso.style.display = "none";
+      btnCalibrar.style.display = "block";
+      instr.textContent = "Pon el teléfono en posición inicial y toca calibrar.";
+      window.addEventListener("deviceorientationabsolute", handler, true);
+      window.addEventListener("deviceorientation", handler, true);
+    }
+
+    // ---- CALIBRAR ----
     function calibrar(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       if (alphaAnterior === null) {
-        estadoCalib.textContent = "ESPERA, no llega lectura. ¿Pediste permiso?";
-        boxCalib.classList.add("err");
+        instr.textContent = "Esperando lectura del sensor… gira un poco el teléfono.";
         return;
       }
       origen = acumulado;
-      estadoCalib.textContent = "✓ CALIBRADO";
-      boxCalib.classList.remove("err");
-      boxCalib.classList.add("ok");
+      anguloPrevio = 0;
+      instr.textContent = "✓ Calibrado. Gira el teléfono como una perilla.";
       btnCalibrar.textContent = "🔄 RECALIBRAR";
       Protobject.Core.send({ angulo: 0, vueltas: 0 }).to("index.html");
     }
 
     btnCalibrar.addEventListener("touchstart", calibrar);
     btnCalibrar.addEventListener("click", calibrar);
+
+    // En navegadores sin permiso explícito (Android), iniciamos solos.
+    if (typeof DeviceOrientationEvent === "undefined" ||
+        typeof DeviceOrientationEvent.requestPermission !== "function") {
+      iniciar();
+    }
   </script>
 
   <script src="config.js"></script>

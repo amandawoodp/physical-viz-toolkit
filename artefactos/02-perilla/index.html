@@ -23,7 +23,6 @@
       color: #666;
       margin-top: -20px;
     }
-    /* Indicador visual: una flecha que rota */
     #perilla {
       width: 320px;
       height: 320px;
@@ -87,8 +86,6 @@
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
-    console.log("PC: registrando callback onReceived...");
-
     const flecha = document.getElementById("flecha");
     const anguloEl = document.getElementById("angulo");
     const sentidoEl = document.getElementById("sentido");
@@ -97,25 +94,26 @@
     let primerMensaje = false;
     let anguloPrevio = 0;
 
-    // El teléfono nos envía un OBJETO con dos cosas:
+    // El teléfono envía un objeto con dos cosas:
     //   { angulo: número, vueltas: número }
-    // angulo = ángulo total acumulado desde la calibración (puede ser +
-    // o -, y crecer más allá de 360 si das varias vueltas).
+    // angulo = ángulo total acumulado desde la calibración (puede ser
+    // positivo o negativo, y crecer más allá de 360 si das varias vueltas).
     Protobject.Core.onReceived((datos) => {
       const angulo = datos.angulo;
       const vueltas = datos.vueltas;
 
-      // Rotar la flecha visualmente (módulo 360 para no acumular CSS)
+      // Rotar la flecha visualmente
       flecha.style.transform = "translateX(-50%) rotate(" + angulo + "deg)";
 
       // Mostrar el ángulo numéricamente
       anguloEl.textContent = Math.round(angulo) + "°";
 
-      // Mostrar sentido del último movimiento + número de vueltas completas
+      // Mostrar sentido del último movimiento + número de vueltas
       const dif = angulo - anguloPrevio;
       if (Math.abs(dif) > 1) {
-        sentidoEl.textContent = (dif > 0 ? "↻ Horario" : "↺ Antihorario") +
-                                 "  ·  " + vueltas + " vuelta" + (Math.abs(vueltas) === 1 ? "" : "s");
+        const flecha = dif > 0 ? "↻ Horario" : "↺ Antihorario";
+        const vueltasTexto = Math.abs(vueltas) + " vuelta" + (Math.abs(vueltas) === 1 ? "" : "s");
+        sentidoEl.textContent = flecha + "  ·  " + vueltasTexto;
       }
       anguloPrevio = angulo;
 
