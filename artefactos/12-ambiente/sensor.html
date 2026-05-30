@@ -161,6 +161,11 @@
     btnLuz.addEventListener("click", (e) => calibrar(true, e));
     btnSombra.addEventListener("touchstart", (e) => calibrar(false, e));
     btnSombra.addEventListener("click", (e) => calibrar(false, e));
+
+        setTimeout(() => {
+      Protobject.LightSensor.showPreview({ top: 350, left: 10, width: 280, height: 200 });
+    }, 1500);
+  
   </script>
 
   <script src="config.js"></script>
