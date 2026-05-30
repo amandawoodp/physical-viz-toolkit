@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Panel con agujeros</title>
+  <style>
+    :root {
+      --bg: #f6f1e8;
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --card: #fffaf0;
+      --line: rgba(31, 41, 55, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.9), transparent 28rem),
+        var(--bg);
+      color: var(--ink);
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 28px;
+      padding: 38px;
+      transition: background 0.35s ease, color 0.35s ease;
+    }
+
+    body.agua { --bg: #e0f2fe; --card: #f0f9ff; }
+    body.energia { --bg: #fef3c7; --card: #fff7ed; }
+    body.transporte { --bg: #e5e7eb; --card: #f9fafb; }
+    body.residuos { --bg: #dcfce7; --card: #f0fdf4; }
+    body.verde { --bg: #d9f99d; --card: #f7fee7; }
+    body.poblacion { --bg: #ede9fe; --card: #faf5ff; }
+
+    #ProtobjectPlusButton {
+      width: auto !important;
+      height: auto !important;
+      padding: 14px 24px !important;
+      font-size: 16px !important;
+      white-space: nowrap !important;
+      top: 20px !important;
+      left: 20px !important;
+      right: auto !important;
+      bottom: auto !important;
+      border-radius: 30px !important;
+      z-index: 50 !important;
+    }
+
+    #ProtobjectPlusButton:after {
+      content: " Conectar tablet";
+    }
+
+    .hero {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-width: 0;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2.6rem, 7vw, 6.4rem);
+      line-height: 0.92;
+      letter-spacing: -0.06em;
+    }
+
+    #descripcion {
+      margin-top: 22px;
+      max-width: 720px;
+      font-size: clamp(1.2rem, 2vw, 1.8rem);
+      line-height: 1.35;
+      color: #374151;
+    }
+
+    .big-icon {
+      font-size: clamp(8rem, 20vw, 16rem);
+      line-height: 1;
+      margin-top: 36px;
+      filter: drop-shadow(0 20px 30px rgba(0,0,0,0.12));
+      transition: transform 0.25s ease;
+    }
+
+    .big-icon.pop {
+      transform: scale(1.08) rotate(-3deg);
+    }
+
+    .panel {
+      align-self: center;
+      background: rgba(255,255,255,0.6);
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      padding: 28px;
+      box-shadow: 0 24px 70px rgba(31,41,55,0.12);
+      backdrop-filter: blur(12px);
+    }
+
+    .status {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      padding: 24px;
+      margin-bottom: 18px;
+    }
+
+    .status-label {
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 800;
+    }
+
+    #estado {
+      margin-top: 10px;
+      font-size: 2.5rem;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+    }
+
+    .meter {
+      margin-top: 20px;
+    }
+
+    .meter-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      font-size: 0.95rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    #valor {
+      font-weight: 900;
+      color: var(--ink);
+      font-size: 1.25rem;
+    }
+
+    .bar {
+      height: 22px;
+      background: rgba(17,24,39,0.1);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    #barFill {
+      width: 0%;
+      height: 100%;
+      border-radius: 999px;
+      background: currentColor;
+      transition: width 0.35s ease;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .chip {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.48);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-weight: 700;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      opacity: 0.7;
+    }
+
+    .chip.active {
+      color: var(--ink);
+      background: var(--card);
+      opacity: 1;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(31,41,55,0.08);
+    }
+
+    .history {
+      margin-top: 18px;
+      font-size: 0.95rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .history strong {
+      color: var(--ink);
+    }
+
+    @media (max-width: 900px) {
+      body {
+        grid-template-columns: 1fr;
+        padding: 26px;
+      }
+
+      .big-icon {
+        margin-top: 18px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="hero">
+    <div class="eyebrow">Ejemplo 08 · Panel con agujeros</div>
+    <h1 id="titulo">Toca una zona del panel</h1>
+    <div id="descripcion">
+      Coloca la lámina de cartón sobre la tablet y toca a través de los agujeros.
+      La selección aparecerá aquí como una visualización simple.
+    </div>
+    <div id="icono" class="big-icon">▦</div>
+  </main>
+
+  <aside class="panel">
+    <section class="status">
+      <div class="status-label">Selección actual</div>
+      <div id="estado">Esperando panel</div>
+
+      <div class="meter">
+        <div class="meter-top">
+          <span>Valor de ejemplo</span>
+          <span id="valor">—</span>
+        </div>
+        <div class="bar">
+          <div id="barFill"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid" id="chips"></section>
+
+    <section class="history" id="historial">
+      Conecta la tablet desde el botón superior izquierdo.
+    </section>
+  </aside>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    const OPCIONES = {
+      agua: {
+        id: "agua",
+        label: "Agua",
+        emoji: "💧",
+        valor: 78,
+        descripcion: "Indicadores asociados a consumo, disponibilidad y cuidado del agua."
+      },
+      energia: {
+        id: "energia",
+        label: "Energía",
+        emoji: "⚡",
+        valor: 64,
+        descripcion: "Consumo energético, fuentes renovables y eficiencia."
+      },
+      transporte: {
+        id: "transporte",
+        label: "Transporte",
+        emoji: "🚌",
+        valor: 52,
+        descripcion: "Movilidad urbana, tiempos de traslado y modos de transporte."
+      },
+      residuos: {
+        id: "residuos",
+        label: "Residuos",
+        emoji: "♻️",
+        valor: 43,
+        descripcion: "Generación, reciclaje y gestión de residuos."
+      },
+      verde: {
+        id: "verde",
+        label: "Áreas verdes",
+        emoji: "🌿",
+        valor: 71,
+        descripcion: "Superficie verde, acceso a parques y biodiversidad urbana."
+      },
+      poblacion: {
+        id: "poblacion",
+        label: "Población",
+        emoji: "👥",
+        valor: 89,
+        descripcion: "Densidad, crecimiento y distribución de habitantes."
+      }
+    };
+
+    const chipsEl = document.getElementById("chips");
+    const tituloEl = document.getElementById("titulo");
+    const descripcionEl = document.getElementById("descripcion");
+    const iconoEl = document.getElementById("icono");
+    const estadoEl = document.getElementById("estado");
+    const valorEl = document.getElementById("valor");
+    const barFillEl = document.getElementById("barFill");
+    const historialEl = document.getElementById("historial");
+
+    const historial = [];
+
+    function crearChips() {
+      chipsEl.innerHTML = Object.values(OPCIONES).map(opcion => `
+        <div class="chip" data-id="${opcion.id}">
+          <span>${opcion.emoji}</span>
+          <span>${opcion.label}</span>
+        </div>
+      `).join("");
+    }
+
+    function activarChip(id) {
+      document.querySelectorAll(".chip").forEach(chip => {
+        chip.classList.toggle("active", chip.dataset.id === id);
+      });
+    }
+
+    function actualizarPantalla(datos) {
+      const opcion = OPCIONES[datos.id] || datos;
+      if (!opcion || !opcion.id) return;
+
+      document.body.classList.remove("agua", "energia", "transporte", "residuos", "verde", "poblacion");
+      document.body.classList.add(opcion.id);
+
+      tituloEl.textContent = opcion.label;
+      descripcionEl.textContent = opcion.descripcion || "Zona seleccionada desde el panel físico.";
+      iconoEl.textContent = opcion.emoji || "●";
+      estadoEl.textContent = opcion.label;
+      valorEl.textContent = Math.round(opcion.valor || 0) + "%";
+      barFillEl.style.width = Math.max(0, Math.min(100, opcion.valor || 0)) + "%";
+
+      iconoEl.classList.add("pop");
+      setTimeout(() => iconoEl.classList.remove("pop"), 220);
+
+      activarChip(opcion.id);
+
+      historial.unshift(opcion.label);
+      if (historial.length > 5) historial.pop();
+
+      historialEl.innerHTML =
+        "<strong>Últimos toques:</strong> " + historial.join(" · ");
+    }
+
+    crearChips();
+
+    Protobject.Core.onReceived((datos) => {
+      if (!datos || datos.tipo !== "panel") return;
+      actualizarPantalla(datos);
+    });
+
+    // Permite probar la pantalla sin tablet, usando teclas 1–6.
+    window.addEventListener("keydown", (e) => {
+      const ids = Object.keys(OPCIONES);
+      const index = Number(e.key) - 1;
+      if (index >= 0 && index < ids.length) {
+        actualizarPantalla(OPCIONES[ids[index]]);
+      }
+    });
+  </script>
+
+  <script src="config.js"></script>
+</body>
+</html>

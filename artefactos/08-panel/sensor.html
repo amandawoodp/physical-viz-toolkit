@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Panel con agujeros</title>
+
+  <style>
+    :root {
+      --bg: #111827;
+      --panel: #f5efe2;
+      --ink: #111827;
+      --muted: #6b7280;
+      --target: #ffffff;
+      --targetActive: #bbf7d0;
+      --outline: rgba(255,255,255,0.6);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: white;
+      touch-action: manipulation;
+    }
+
+    body {
+      position: fixed;
+      inset: 0;
+    }
+
+    .stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      padding: 20px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 14px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 56px;
+      z-index: 5;
+    }
+
+    .title {
+      font-size: clamp(16px, 2.2vw, 26px);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+
+    .status {
+      font-size: clamp(13px, 1.6vw, 18px);
+      color: rgba(255,255,255,0.72);
+      text-align: right;
+    }
+
+    .fullscreen {
+      border: 1px solid rgba(255,255,255,0.45);
+      background: rgba(255,255,255,0.12);
+      color: white;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .panel {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border: 3px dashed var(--outline);
+      border-radius: 28px;
+      background:
+        linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px),
+        rgba(255,255,255,0.04);
+      background-size: 40px 40px;
+      overflow: hidden;
+    }
+
+    .hole {
+      position: absolute;
+      width: clamp(112px, 17vw, 190px);
+      height: clamp(112px, 17vw, 190px);
+      border-radius: 999px;
+      transform: translate(-50%, -50%);
+      border: 8px solid rgba(255,255,255,0.32);
+      background: var(--target);
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-weight: 900;
+      box-shadow:
+        0 18px 40px rgba(0,0,0,0.28),
+        inset 0 0 0 2px rgba(17,24,39,0.08);
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: transform 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .hole:active,
+    .hole.active {
+      background: var(--targetActive);
+      transform: translate(-50%, -50%) scale(0.94);
+      box-shadow:
+        0 8px 22px rgba(0,0,0,0.3),
+        inset 0 0 0 3px rgba(34,197,94,0.28);
+    }
+
+    .hole .num {
+      font-size: clamp(20px, 3vw, 42px);
+      line-height: 1;
+    }
+
+    .hole .emoji {
+      font-size: clamp(26px, 4vw, 54px);
+      line-height: 1;
+    }
+
+    .hole .label {
+      font-size: clamp(10px, 1.3vw, 16px);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      max-width: 90%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Posiciones físicas de los 6 agujeros.
+       Si el cartón no calza, ajusta estos porcentajes. */
+    .hole[data-id="agua"]       { left: 20%; top: 28%; }
+    .hole[data-id="energia"]    { left: 50%; top: 28%; }
+    .hole[data-id="transporte"] { left: 80%; top: 28%; }
+    .hole[data-id="residuos"]   { left: 20%; top: 72%; }
+    .hole[data-id="verde"]      { left: 50%; top: 72%; }
+    .hole[data-id="poblacion"]  { left: 80%; top: 72%; }
+
+    .bottombar {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: center;
+      color: rgba(255,255,255,0.72);
+      font-size: clamp(12px, 1.4vw, 16px);
+      z-index: 5;
+    }
+
+    .last {
+      font-weight: 900;
+      color: white;
+    }
+
+    @media (orientation: portrait) {
+      .stage {
+        padding: 14px;
+      }
+
+      .panel {
+        border-radius: 22px;
+      }
+
+      .hole {
+        width: clamp(88px, 25vw, 150px);
+        height: clamp(88px, 25vw, 150px);
+      }
+
+      .hole[data-id="agua"]       { left: 28%; top: 19%; }
+      .hole[data-id="energia"]    { left: 72%; top: 19%; }
+      .hole[data-id="transporte"] { left: 28%; top: 50%; }
+      .hole[data-id="residuos"]   { left: 72%; top: 50%; }
+      .hole[data-id="verde"]      { left: 28%; top: 81%; }
+      .hole[data-id="poblacion"]  { left: 72%; top: 81%; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="stage">
+    <header class="topbar">
+      <button class="fullscreen" id="fullscreenBtn">Pantalla completa</button>
+      <div>
+        <div class="title">Panel con agujeros</div>
+        <div class="status" id="estado">Toca una zona para enviar datos</div>
+      </div>
+    </header>
+
+    <main class="panel" id="panel">
+      <button class="hole" data-id="agua" aria-label="Agua">
+        <span class="num">1</span>
+        <span class="emoji">💧</span>
+        <span class="label">Agua</span>
+      </button>
+
+      <button class="hole" data-id="energia" aria-label="Energía">
+        <span class="num">2</span>
+        <span class="emoji">⚡</span>
+        <span class="label">Energía</span>
+      </button>
+
+      <button class="hole" data-id="transporte" aria-label="Transporte">
+        <span class="num">3</span>
+        <span class="emoji">🚌</span>
+        <span class="label">Transporte</span>
+      </button>
+
+      <button class="hole" data-id="residuos" aria-label="Residuos">
+        <span class="num">4</span>
+        <span class="emoji">♻️</span>
+        <span class="label">Residuos</span>
+      </button>
+
+      <button class="hole" data-id="verde" aria-label="Áreas verdes">
+        <span class="num">5</span>
+        <span class="emoji">🌿</span>
+        <span class="label">Áreas verdes</span>
+      </button>
+
+      <button class="hole" data-id="poblacion" aria-label="Población">
+        <span class="num">6</span>
+        <span class="emoji">👥</span>
+        <span class="label">Población</span>
+      </button>
+    </main>
+
+    <footer class="bottombar">
+      <span>Coloca el cartón encima: cada agujero debe dejar visible un círculo.</span>
+      <span>Último toque: <span class="last" id="ultimo">—</span></span>
+    </footer>
+  </div>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    const OPCIONES = {
+      agua: {
+        id: "agua",
+        label: "Agua",
+        emoji: "💧",
+        valor: 78,
+        descripcion: "Indicadores asociados a consumo, disponibilidad y cuidado del agua."
+      },
+      energia: {
+        id: "energia",
+        label: "Energía",
+        emoji: "⚡",
+        valor: 64,
+        descripcion: "Consumo energético, fuentes renovables y eficiencia."
+      },
+      transporte: {
+        id: "transporte",
+        label: "Transporte",
+        emoji: "🚌",
+        valor: 52,
+        descripcion: "Movilidad urbana, tiempos de traslado y modos de transporte."
+      },
+      residuos: {
+        id: "residuos",
+        label: "Residuos",
+        emoji: "♻️",
+        valor: 43,
+        descripcion: "Generación, reciclaje y gestión de residuos."
+      },
+      verde: {
+        id: "verde",
+        label: "Áreas verdes",
+        emoji: "🌿",
+        valor: 71,
+        descripcion: "Superficie verde, acceso a parques y biodiversidad urbana."
+      },
+      poblacion: {
+        id: "poblacion",
+        label: "Población",
+        emoji: "👥",
+        valor: 89,
+        descripcion: "Densidad, crecimiento y distribución de habitantes."
+      }
+    };
+
+    const estadoEl = document.getElementById("estado");
+    const ultimoEl = document.getElementById("ultimo");
+    const fullscreenBtn = document.getElementById("fullscreenBtn");
+
+    let ultimoEnvio = 0;
+
+    function enviarSeleccion(id) {
+      const opcion = OPCIONES[id];
+      if (!opcion) return;
+
+      const ahora = Date.now();
+
+      // Evita dobles envíos por toques repetidos demasiado rápidos.
+      if (ahora - ultimoEnvio < 160) return;
+      ultimoEnvio = ahora;
+
+      document.querySelectorAll(".hole").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.id === id);
+      });
+
+      estadoEl.textContent = "Enviado: " + opcion.label;
+      ultimoEl.textContent = opcion.label;
+
+      const mensaje = {
+        tipo: "panel",
+        accion: "press",
+        id: opcion.id,
+        label: opcion.label,
+        emoji: opcion.emoji,
+        valor: opcion.valor,
+        descripcion: opcion.descripcion,
+        timestamp: ahora
+      };
+
+      Protobject.Core.send(mensaje).to("index.html");
+
+      setTimeout(() => {
+        const btn = document.querySelector('.hole[data-id="' + id + '"]');
+        if (btn) btn.classList.remove("active");
+      }, 250);
+    }
+
+    document.querySelectorAll(".hole").forEach(btn => {
+      btn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        enviarSeleccion(btn.dataset.id);
+      });
+    });
+
+    fullscreenBtn.addEventListener("click", async () => {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+          fullscreenBtn.textContent = "Salir de pantalla completa";
+        } else {
+          await document.exitFullscreen();
+          fullscreenBtn.textContent = "Pantalla completa";
+        }
+      } catch (err) {
+        estadoEl.textContent = "No se pudo activar pantalla completa";
+        console.warn(err);
+      }
+    });
+
+    // Permite probar en computador usando teclas 1–6.
+    window.addEventListener("keydown", (e) => {
+      const ids = Object.keys(OPCIONES);
+      const index = Number(e.key) - 1;
+      if (index >= 0 && index < ids.length) {
+        enviarSeleccion(ids[index]);
+      }
+    });
+  </script>
+
+  <script src="config.js"></script>
+</body>
+</html>
