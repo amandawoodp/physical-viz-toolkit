@@ -20,30 +20,46 @@
     const instr = document.getElementById("instr");
     const valorEl = document.getElementById("valor");
 
-    // ---- 0) FORZAR CÁMARA TRASERA EN iPhone ----
-    // En iOS, los índices de cámara no son confiables. La forma
-    // robusta es pedirla explícitamente con facingMode: "environment".
-    // Hacemos esta llamada antes que cualquier cosa para que el
-    // navegador "reserve" la cámara correcta.
-    navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { exact: "environment" } }
-    }).then((stream) => {
-      // Inmediatamente la cerramos: solo queríamos forzar la elección.
-      stream.getTracks().forEach(t => t.stop());
+    // ---- FORZAR CÁMARA TRASERA EN iPhone ----
+    // Paso 1: pedimos permiso de cámara con facingMode environment.
+    //         Esto hace que iOS revele los labels de las cámaras.
+    // Paso 2: enumeramos las cámaras y buscamos la trasera por nombre
+    //         (en iPhone se llama "Back Camera" o "Cámara posterior").
+    // Paso 3: pasamos su índice REAL a Protobject.Aruco.start().
+    async function elegirYIniciar() {
+      try {
+        // Paso 1
+        const tmp = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        tmp.getTracks().forEach(t => t.stop());
 
-      // Ahora arrancamos ArUco. Como ya "tocamos" la trasera primero,
-      // el navegador se la entrega cuando Protobject la pida.
-      iniciarSensor();
-    }).catch((err) => {
-      console.warn("No pude forzar trasera, uso default:", err);
-      iniciarSensor();
-    });
+        // Paso 2
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const camaras = devices.filter(d => d.kind === "videoinput");
+        console.log("Cámaras encontradas:", camaras);
 
-    function iniciarSensor() {
-      // Detecta marcadores cada 100 ms
-      Protobject.Aruco.start(100, 0);
+        let idxTrasera = 0;
+        for (let i = 0; i < camaras.length; i++) {
+          const nombre = camaras[i].label.toLowerCase();
+          if (nombre.includes("back") || nombre.includes("posterior") ||
+              nombre.includes("rear") || nombre.includes("trasera")) {
+            idxTrasera = i;
+            break;
+          }
+        }
+        console.log("Usando cámara índice:", idxTrasera, camaras[idxTrasera]?.label);
+
+        // Paso 3
+        Protobject.Aruco.start(100, idxTrasera);
+      } catch (err) {
+        console.warn("Falló elección de cámara, uso 0 por defecto:", err);
+        Protobject.Aruco.start(100, 0);
+      }
+
       Protobject.Aruco.showPreview({ top: 200, left: 10, width: 320, height: 240 });
     }
+    elegirYIniciar();
 
     // ---- ESTADO DE CALIBRACIÓN ----
     let xMin = null;
@@ -57,6 +73,8 @@
       const ids = Object.keys(data);
       if (ids.length === 0) return;
 
+      // Tomamos el marcador más grande (la cara más cercana a la cámara).
+      // Así el slider funciona con cualquier cara del cubo.
       let mejorId = ids[0];
       for (const id of ids) {
         if (data[id].size > data[mejorId].size) mejorId = id;
@@ -66,11 +84,14 @@
 
       if (etapa !== "listo") return;
 
+      // Normalizar al rango calibrado [0, 1]
       let t = (ultimaX - xMin) / (xMax - xMin);
       t = Math.max(0, Math.min(1, t));
 
-      const bin = Math.min(9, Math.floor(t * 10));
+      // Mapear a 3 casillas discretas: 0, 1, 2
+      const bin = Math.min(2, Math.floor(t * 3));
 
+      // Enviar SOLO cuando cambia la casilla
       if (bin !== binAnterior) {
         binAnterior = bin;
         Protobject.Core.send(bin).to("index.html");
