@@ -97,7 +97,7 @@
       // Enviar SOLO cuando cambia la casilla: ese es el evento semántico.
       if (bin !== binAnterior) {
         binAnterior = bin;
-        Protobject.Core.send(bin).to("Pantalla");
+        Protobject.Core.send(bin).to("index.html");
         console.log("Enviado al PC:", bin);
       }
     });
