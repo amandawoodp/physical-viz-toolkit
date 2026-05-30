@@ -14,8 +14,10 @@
   <div id="instr">Apunta la cámara al canal.<br>Pon el cubo en el EXTREMO IZQUIERDO y toca aquí.</div>
   <div id="valor">—</div>
 
+  <!-- 1) Framework -->
   <script src="https://app.protobject.com/framework/p.js"></script>
-  <script src="config.js"></script>
+
+  <!-- 2) Lógica del sensor: registramos onReceived (aunque aquí no lo usemos), startup, etc. -->
   <script>
     const instr = document.getElementById("instr");
     const valorEl = document.getElementById("valor");
@@ -67,7 +69,6 @@
         if (data[id].size > data[mejorId].size) mejorId = id;
       }
 
-      // Con el teléfono horizontal el canal corre a lo largo del eje Y
       ultimaX = data[mejorId].position.y;
 
       if (etapa !== "listo") {
@@ -79,7 +80,6 @@
       t = Math.max(0, Math.min(1, t));
 
       const bin = Math.min(2, Math.floor(t * 3));
-
       valorEl.textContent = "bin: " + bin + " (t=" + t.toFixed(2) + ")";
 
       if (bin !== binAnterior) {
@@ -105,5 +105,8 @@
       }
     });
   </script>
+
+  <!-- 3) ÚLTIMO: arrancar Protobject. Ya está todo registrado arriba. -->
+  <script src="config.js"></script>
 </body>
 </html>

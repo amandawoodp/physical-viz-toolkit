@@ -52,18 +52,22 @@
   <div id="subtitulo">Desliza el cubo por el canal: izquierda, centro o derecha</div>
   <div id="salida">—</div>
 
+  <!-- 1) Cargar el framework Protobject -->
   <script src="https://app.protobject.com/framework/p.js"></script>
-  <script src="config.js"></script>
-  <script>
-    console.log("PC: pantalla iniciada, esperando datos del teléfono...");
 
-    // Registra el callback PARA mensajes provenientes de sensor.html.
-    // El .from() es lo que hace que Protobject lo asocie al canal correcto.
+  <!-- 2) REGISTRAR EL CALLBACK ANTES de config.js -->
+  <!-- Esto es crítico: cuando config.js corra initialize() y se
+       abran las conexiones, el callback ya debe estar listo. -->
+  <script>
+    console.log("PC: registrando callback onReceived...");
     Protobject.Core.onReceived((valor) => {
       console.log("PC recibió:", valor);
       document.getElementById("salida").textContent = valor;
-    }).from("sensor.html");
+    });
   </script>
+
+  <!-- 3) Recién ahora inicializar Protobject -->
+  <script src="config.js"></script>
 
 </body>
 </html>
