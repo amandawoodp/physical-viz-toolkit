@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Perilla giratoria</title>
+  <style>
+    body {
+      margin: 0; height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: sans-serif; background: #f4f4f4;
+      gap: 30px;
+    }
+    #titulo {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #2a7;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    #subtitulo {
+      font-size: 1.2rem;
+      color: #666;
+      margin-top: -20px;
+    }
+    /* Indicador visual: una flecha que rota */
+    #perilla {
+      width: 320px;
+      height: 320px;
+      border-radius: 50%;
+      background: #fff;
+      border: 6px solid #2a7;
+      position: relative;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+    #flecha {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      width: 8px;
+      height: 130px;
+      background: #e63946;
+      transform-origin: bottom center;
+      transform: translateX(-50%) rotate(0deg);
+      border-radius: 4px;
+      transition: transform 0.1s linear;
+    }
+    #angulo {
+      font-size: 3rem;
+      font-weight: bold;
+      color: #222;
+    }
+    #sentido {
+      font-size: 1.4rem;
+      color: #666;
+      height: 1.5em;
+    }
+    #ProtobjectPlusButton {
+      width: auto !important;
+      height: auto !important;
+      padding: 14px 24px !important;
+      font-size: 16px !important;
+      white-space: nowrap !important;
+      top: 20px !important;
+      left: 20px !important;
+      right: auto !important;
+      bottom: auto !important;
+      border-radius: 30px !important;
+    }
+    #ProtobjectPlusButton:after {
+      content: " Conectar teléfono";
+    }
+  </style>
+</head>
+<body>
+
+  <div id="titulo">Ejemplo 2 · Perilla giratoria</div>
+  <div id="subtitulo">Gira el teléfono como si fuera una perilla</div>
+
+  <div id="perilla">
+    <div id="flecha"></div>
+  </div>
+
+  <div id="angulo">0°</div>
+  <div id="sentido">—</div>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    console.log("PC: registrando callback onReceived...");
+
+    const flecha = document.getElementById("flecha");
+    const anguloEl = document.getElementById("angulo");
+    const sentidoEl = document.getElementById("sentido");
+    const subtituloEl = document.getElementById("subtitulo");
+
+    let primerMensaje = false;
+    let anguloPrevio = 0;
+
+    // El teléfono nos envía un OBJETO con dos cosas:
+    //   { angulo: número, vueltas: número }
+    // angulo = ángulo total acumulado desde la calibración (puede ser +
+    // o -, y crecer más allá de 360 si das varias vueltas).
+    Protobject.Core.onReceived((datos) => {
+      const angulo = datos.angulo;
+      const vueltas = datos.vueltas;
+
+      // Rotar la flecha visualmente (módulo 360 para no acumular CSS)
+      flecha.style.transform = "translateX(-50%) rotate(" + angulo + "deg)";
+
+      // Mostrar el ángulo numéricamente
+      anguloEl.textContent = Math.round(angulo) + "°";
+
+      // Mostrar sentido del último movimiento + número de vueltas completas
+      const dif = angulo - anguloPrevio;
+      if (Math.abs(dif) > 1) {
+        sentidoEl.textContent = (dif > 0 ? "↻ Horario" : "↺ Antihorario") +
+                                 "  ·  " + vueltas + " vuelta" + (Math.abs(vueltas) === 1 ? "" : "s");
+      }
+      anguloPrevio = angulo;
+
+      if (!primerMensaje) {
+        primerMensaje = true;
+        subtituloEl.textContent = "✓ Teléfono conectado · gira la perilla";
+        subtituloEl.style.color = "#2a7";
+      }
+    });
+  </script>
+
+  <script src="config.js"></script>
+
+</body>
+</html>
