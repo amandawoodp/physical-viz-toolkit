@@ -2,29 +2,49 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Sensor perilla</title>
   <style>
+    * { box-sizing: border-box; }
     body {
       font-family: sans-serif; padding: 20px; text-align: center;
-      background: #fafafa;
+      background: #fafafa; margin: 0;
     }
     #instr {
       font-size: 22px; margin-top: 20px;
     }
     #valor {
-      font-size: 50px; margin-top: 30px; color: #2a7; font-weight: bold;
+      font-size: 50px; margin-top: 20px; color: #2a7; font-weight: bold;
     }
-    button {
-      margin-top: 30px; padding: 16px 32px; font-size: 18px;
-      background: #2a7; color: white; border: none; border-radius: 30px;
+    /* Botón GIGANTE y arriba para que sea imposible no tocarlo */
+    #calibrar {
+      display: block;
+      width: 90%;
+      max-width: 400px;
+      margin: 30px auto;
+      padding: 30px 20px;
+      font-size: 24px;
+      font-weight: bold;
+      background: #2a7;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: rgba(0,0,0,0.2);
+      touch-action: manipulation;
+    }
+    #calibrar:active {
+      background: #1a5;
+      transform: scale(0.98);
     }
   </style>
 </head>
 <body>
   <div id="instr">Pon el teléfono plano sobre la mesa, en su posición inicial.</div>
+
+  <button id="calibrar">📍 CALIBRAR COMO POSICIÓN 0</button>
+
   <div id="valor">—</div>
-  <button id="calibrar">Calibrar como posición 0</button>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
@@ -34,73 +54,69 @@
     const btnCalibrar = document.getElementById("calibrar");
 
     // ---- INICIAR SENSOR DE ORIENTACIÓN ----
-    // El componente Orientation entrega 4 valores:
-    //   horizontal           → ángulo "compás" 0-360, salta al cruzar el origen
-    //   vertical             → inclinación adelante/atrás
-    //   horizontalContinuous → MISMO ángulo pero SIN saltos al cruzar 360°
-    //   verticalContinuous   → vertical sin saltos
-    //
-    // Para una perilla que puede girar varias vueltas en ambos sentidos,
-    // horizontalContinuous es perfecto: si giras dos veces en sentido
-    // horario, el valor llega a +720. Si giras en antihorario, llega a
-    // valores negativos. Nunca se resetea.
-    Protobject.Orientation.start(100); // muestreo cada 100 ms
+    Protobject.Orientation.start(100);
 
     // ---- ESTADO ----
-    let origen = null;          // valor de horizontalContinuous al calibrar
-    let anguloPrevio = null;    // para evitar enviar lo mismo muchas veces
-    const UMBRAL_GRADOS = 1;    // solo envía cambios > 1° (filtra ruido)
+    let origen = null;
+    let anguloPrevio = null;
+    let ultimoContinuous = null;
+    const UMBRAL_GRADOS = 1;
 
     // ---- LECTURA ----
     Protobject.Orientation.onData((data) => {
       const cont = data.horizontalContinuous;
       if (cont === undefined || cont === null) return;
 
-      // Si aún no se calibró, mostrar el valor crudo para ayudar al
-      // usuario a entender qué hace el sensor.
+      // Guardamos siempre la última lectura, para que el botón Calibrar
+      // pueda usarla sin tener que esperar el próximo onData.
+      ultimoContinuous = cont;
+
       if (origen === null) {
-        valorEl.textContent = Math.round(cont) + "°";
+        // Aún sin calibrar: mostrar valor crudo del sensor
+        valorEl.textContent = Math.round(cont) + "° (sin calibrar)";
         return;
       }
 
-      // Ángulo relativo al origen. Aquí es donde nace el "evento semántico":
-      // ya no es "el teléfono apunta al norte magnético X", sino "la perilla
-      // ha girado Y grados desde que el usuario la calibró".
       const angulo = cont - origen;
-
-      // Vueltas completas (positivo = horario, negativo = antihorario).
-      // Math.trunc redondea hacia 0, así que -370° → -1 vuelta, +370° → +1.
       const vueltas = Math.trunc(angulo / 360);
 
-      // Filtro de ruido: solo enviar si cambió más que UMBRAL_GRADOS
-      // desde el último envío. Evita saturar con micro-vibraciones.
       if (anguloPrevio !== null && Math.abs(angulo - anguloPrevio) < UMBRAL_GRADOS) {
         return;
       }
       anguloPrevio = angulo;
 
-      // Mostrar localmente
       valorEl.textContent = Math.round(angulo) + "°";
 
-      // Enviar al PC un objeto con el ángulo y las vueltas
       Protobject.Core.send({ angulo: angulo, vueltas: vueltas }).to("index.html");
     });
 
     // ---- CALIBRACIÓN ----
-    // Un solo toque: registra el ángulo actual como "0°".
-    // El usuario puede recalibrar las veces que quiera.
-    btnCalibrar.addEventListener("click", () => {
-      // Necesitamos una lectura reciente. Forzamos: pedimos una vez.
-      Protobject.Orientation.onData((data) => {
-        if (data.horizontalContinuous === undefined) return;
-        origen = data.horizontalContinuous;
-        anguloPrevio = 0;
-        instr.textContent = "✓ Calibrado. Gira el teléfono como una perilla.";
-        btnCalibrar.textContent = "Recalibrar";
-        // Enviar inmediatamente "0°" para que el PC vuelva al inicio
-        Protobject.Core.send({ angulo: 0, vueltas: 0 }).to("index.html");
-      });
-    });
+    // Función que hace la calibración. La llamamos tanto en click como
+    // en touchstart, para que funcione en cualquier navegador.
+    function calibrar(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      if (ultimoContinuous === null) {
+        instr.textContent = "Esperando lectura del sensor... gira un poco el teléfono.";
+        return;
+      }
+
+      origen = ultimoContinuous;
+      anguloPrevio = 0;
+      instr.textContent = "✓ Calibrado. Gira el teléfono como una perilla.";
+      btnCalibrar.textContent = "🔄 RECALIBRAR";
+
+      // Enviar inmediatamente "0°" para que el PC vuelva al inicio
+      Protobject.Core.send({ angulo: 0, vueltas: 0 }).to("index.html");
+      console.log("Calibrado. Origen =", origen);
+    }
+
+    // En iOS, touchstart es MÁS confiable que click.
+    btnCalibrar.addEventListener("touchstart", calibrar);
+    btnCalibrar.addEventListener("click", calibrar);
   </script>
 
   <script src="config.js"></script>
