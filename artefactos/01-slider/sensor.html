@@ -7,7 +7,7 @@
   <style>
     body { font-family: sans-serif; padding: 20px; text-align: center; }
     #instr { font-size: 22px; margin-top: 30px; }
-    #valor { font-size: 60px; margin-top: 20px; color: #2a7; }
+    #valor { font-size: 40px; margin-top: 20px; color: #2a7; }
   </style>
 </head>
 <body>
@@ -21,20 +21,18 @@
     const valorEl = document.getElementById("valor");
 
     // ---- FORZAR CÁMARA TRASERA EN iPhone ----
-    // Paso 1: pedimos permiso de cámara con facingMode environment.
-    //         Esto hace que iOS revele los labels de las cámaras.
-    // Paso 2: enumeramos las cámaras y buscamos la trasera por nombre
-    //         (en iPhone se llama "Back Camera" o "Cámara posterior").
-    // Paso 3: pasamos su índice REAL a Protobject.Aruco.start().
+    // En iOS los índices de cámara no son confiables.
+    // 1) Pedimos permiso con facingMode "environment" para que
+    //    el sistema revele los nombres reales de cada cámara.
+    // 2) Enumeramos las cámaras y buscamos la trasera por nombre.
+    // 3) Pasamos su índice REAL a Protobject.Aruco.start().
     async function elegirYIniciar() {
       try {
-        // Paso 1
         const tmp = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "environment" }
         });
         tmp.getTracks().forEach(t => t.stop());
 
-        // Paso 2
         const devices = await navigator.mediaDevices.enumerateDevices();
         const camaras = devices.filter(d => d.kind === "videoinput");
         console.log("Cámaras encontradas:", camaras);
@@ -50,7 +48,6 @@
         }
         console.log("Usando cámara índice:", idxTrasera, camaras[idxTrasera]?.label);
 
-        // Paso 3
         Protobject.Aruco.start(100, idxTrasera);
       } catch (err) {
         console.warn("Falló elección de cámara, uso 0 por defecto:", err);
@@ -62,27 +59,30 @@
     elegirYIniciar();
 
     // ---- ESTADO DE CALIBRACIÓN ----
-    let xMin = null;
-    let xMax = null;
-    let etapa = "izq";
-    let ultimaX = null;
-    let binAnterior = null;
+    let xMin = null;          // X cuando el cubo está al extremo izquierdo
+    let xMax = null;          // X cuando el cubo está al extremo derecho
+    let etapa = "izq";        // "izq" → "der" → "listo"
+    let ultimaX = null;       // última X detectada del cubo
+    let binAnterior = null;   // última casilla enviada (0, 1 o 2)
 
     // ---- LECTURA DE MARCADORES ----
+    // Protobject entrega todos los marcadores visibles. Tomamos el
+    // de mayor tamaño (la cara más cercana a la cámara). Así el
+    // slider funciona con cualquier cara del cubo.
     Protobject.Aruco.onData((data) => {
       const ids = Object.keys(data);
       if (ids.length === 0) return;
 
-      // Tomamos el marcador más grande (la cara más cercana a la cámara).
-      // Así el slider funciona con cualquier cara del cubo.
       let mejorId = ids[0];
       for (const id of ids) {
         if (data[id].size > data[mejorId].size) mejorId = id;
       }
       ultimaX = data[mejorId].position.x;
-      valorEl.textContent = "x: " + Math.round(ultimaX);
 
-      if (etapa !== "listo") return;
+      if (etapa !== "listo") {
+        valorEl.textContent = "x: " + Math.round(ultimaX);
+        return;
+      }
 
       // Normalizar al rango calibrado [0, 1]
       let t = (ultimaX - xMin) / (xMax - xMin);
@@ -91,10 +91,14 @@
       // Mapear a 3 casillas discretas: 0, 1, 2
       const bin = Math.min(2, Math.floor(t * 3));
 
-      // Enviar SOLO cuando cambia la casilla
+      // Mostrar en el teléfono lo que estamos calculando (depuración)
+      valorEl.textContent = "bin: " + bin + " (t=" + t.toFixed(2) + ")";
+
+      // Enviar SOLO cuando cambia la casilla: ese es el evento semántico.
       if (bin !== binAnterior) {
         binAnterior = bin;
-        Protobject.Core.send(bin).to("index.html");
+        Protobject.Core.send(bin).to("Pantalla");
+        console.log("Enviado al PC:", bin);
       }
     });
 

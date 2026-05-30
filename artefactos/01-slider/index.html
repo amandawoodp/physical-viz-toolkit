@@ -29,8 +29,7 @@
       color: #222;
       line-height: 1;
     }
-    /* Botón "+" que muestra el QR. Lo movemos a la esquina superior
-       izquierda para que no se corte y le damos espacio para el texto. */
+    /* Botón "+" que muestra el QR para conectar el teléfono */
     #ProtobjectPlusButton {
       width: auto !important;
       height: auto !important;
@@ -51,13 +50,13 @@
 <body>
 
   <div id="titulo">Ejemplo 1 · Slider óptico</div>
-  <div id="subtitulo">Desliza el cubo por el canal de 0 a 3</div>
+  <div id="subtitulo">Desliza el cubo por el canal: izquierda, centro o derecha</div>
   <div id="salida">—</div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
   <script src="config.js"></script>
   <script>
-    // Recibe el número ya interpretado (0 a 9) desde el teléfono
+    // Recibe el número ya interpretado (0, 1 o 2) desde el teléfono
     // y lo muestra grande en pantalla. Una entrada → un efecto.
     Protobject.Core.onReceived((valor) => {
       document.getElementById("salida").textContent = valor;
