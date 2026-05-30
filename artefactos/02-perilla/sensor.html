@@ -113,7 +113,7 @@
         let delta = alpha - alphaAnterior;
         if (delta > 180) delta -= 360;       // saltó de 5° a 358° (giro antihorario)
         if (delta < -180) delta += 360;      // saltó de 358° a 5° (giro horario)
-        acumulado += delta;
+        acumulado -= delta;
       }
       alphaAnterior = alpha;
       hcontEl.textContent = acumulado.toFixed(2);
