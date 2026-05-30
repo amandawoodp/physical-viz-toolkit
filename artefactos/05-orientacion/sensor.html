@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Sensor orientación</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: sans-serif; padding: 20px; margin: 0;
+      background: #fafafa; text-align: center;
+    }
+    #instr {
+      font-size: 20px; margin-top: 20px; color: #333;
+      min-height: 3em;
+    }
+    #valor {
+      font-size: 50px; margin: 25px 0; color: #2a7; font-weight: bold;
+    }
+    button {
+      display: block; width: 100%;
+      font-weight: bold;
+      border: none; border-radius: 14px;
+      margin: 12px 0;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+    #permiso {
+      padding: 18px; font-size: 18px;
+      background: #e63946; color: white;
+    }
+    .cal {
+      padding: 22px; font-size: 20px;
+      background: #2a7; color: white;
+    }
+    .cal:active { background: #1a5; }
+    .cal.done { background: #94d2bd; }
+  </style>
+</head>
+<body>
+
+  <button id="permiso">PEDIR PERMISO DE ORIENTACIÓN</button>
+
+  <div id="instr">Pon el teléfono sobre el libro.</div>
+
+  <div id="valor">—</div>
+
+  <button id="calOff" class="cal" style="display:none">📕 CALIBRAR LIBRO CERRADO (OFF)</button>
+  <button id="calOn" class="cal" style="display:none">📖 CALIBRAR LIBRO ABIERTO (ON)</button>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    const instr = document.getElementById("instr");
+    const valorEl = document.getElementById("valor");
+    const btnPermiso = document.getElementById("permiso");
+    const btnOff = document.getElementById("calOff");
+    const btnOn = document.getElementById("calOn");
+
+    // Estado del sensor
+    let ultimoBeta = null;        // inclinación adelante-atrás (-180 a 180)
+    let ultimoGamma = null;       // inclinación izquierda-derecha
+    let valorOff = null;          // valor del sensor con libro cerrado
+    let valorOn = null;           // valor del sensor con libro abierto
+    let estadoActual = null;      // "ON" u "OFF"
+
+    // Margen de "zona muerta" en porcentaje (0-1).
+    // 0.5 = punto medio entre OFF y ON. 0.3 = más cerca de OFF.
+    // Si el libro cruza este umbral, cambia el estado.
+    const UMBRAL = 0.5;
+
+    // ---- LISTENER DEL SENSOR ----
+    // El libro se abre y cierra cambiando su inclinación (eje "bisagra").
+    // Usamos 'beta' porque es la inclinación adelante-atrás del teléfono.
+    // Si el cambio principal viene de gamma en tu montaje, se puede cambiar.
+    function handler(event) {
+      if (event.beta === null) return;
+      ultimoBeta = event.beta;
+      ultimoGamma = event.gamma;
+
+      // Mostrar el valor crudo localmente (útil durante calibración)
+      if (valorOff === null || valorOn === null) {
+        valorEl.textContent = Math.round(ultimoBeta) + "°";
+        return;
+      }
+
+      // Calcular t: 0 cuando está en posición OFF, 1 cuando está en ON.
+      // Sirve para saber en qué lado del umbral estamos sin importar
+      // si abrir el libro aumenta o disminuye beta.
+      let t = (ultimoBeta - valorOff) / (valorOn - valorOff);
+      t = Math.max(0, Math.min(1, t));
+
+      const nuevoEstado = t >= UMBRAL ? "ON" : "OFF";
+
+      valorEl.textContent = nuevoEstado + "  (" + Math.round(ultimoBeta) + "°)";
+
+      // Solo enviar al PC cuando cambia el estado: evento semántico,
+      // no flujo continuo.
+      if (nuevoEstado !== estadoActual) {
+        estadoActual = nuevoEstado;
+        Protobject.Core.send(nuevoEstado).to("index.html");
+      }
+    }
+
+    // ---- PERMISO iOS ----
+    btnPermiso.addEventListener("click", async () => {
+      try {
+        if (typeof DeviceOrientationEvent !== "undefined" &&
+            typeof DeviceOrientationEvent.requestPermission === "function") {
+          const r = await DeviceOrientationEvent.requestPermission();
+          if (r === "granted") iniciar();
+          else instr.textContent = "Permiso denegado. Recarga para reintentar.";
+        } else {
+          iniciar();
+        }
+      } catch (err) {
+        instr.textContent = "Error: " + err.message;
+      }
+    });
+
+    function iniciar() {
+      btnPermiso.style.display = "none";
+      btnOff.style.display = "block";
+      btnOn.style.display = "block";
+      instr.textContent = "Cierra el libro y toca 'CALIBRAR CERRADO'.";
+      window.addEventListener("deviceorientationabsolute", handler, true);
+      window.addEventListener("deviceorientation", handler, true);
+    }
+
+    // ---- CALIBRACIÓN DE LOS DOS ESTADOS ----
+    function calibrar(esOff, e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      if (ultimoBeta === null) {
+        instr.textContent = "Esperando lectura... mueve un poco el libro.";
+        return;
+      }
+
+      if (esOff) {
+        valorOff = ultimoBeta;
+        btnOff.textContent = "✓ CERRADO calibrado en " + Math.round(valorOff) + "°";
+        btnOff.classList.add("done");
+        instr.textContent = "Ahora abre el libro y toca 'CALIBRAR ABIERTO'.";
+      } else {
+        valorOn = ultimoBeta;
+        btnOn.textContent = "✓ ABIERTO calibrado en " + Math.round(valorOn) + "°";
+        btnOn.classList.add("done");
+        instr.textContent = "✓ Listo. Abre y cierra el libro.";
+      }
+    }
+
+    btnOff.addEventListener("touchstart", (e) => calibrar(true, e));
+    btnOff.addEventListener("click", (e) => calibrar(true, e));
+    btnOn.addEventListener("touchstart", (e) => calibrar(false, e));
+    btnOn.addEventListener("click", (e) => calibrar(false, e));
+
+    // Android arranca solo
+    if (typeof DeviceOrientationEvent === "undefined" ||
+        typeof DeviceOrientationEvent.requestPermission !== "function") {
+      iniciar();
+    }
+  </script>
+
+  <script src="config.js"></script>
+</body>
+</html>

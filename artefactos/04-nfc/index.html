@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Lector NFC</title>
+  <style>
+    body {
+      margin: 0; height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: sans-serif; background: #f4f4f4;
+      gap: 30px;
+      transition: background 0.4s;
+    }
+    #titulo {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #2a7;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    #subtitulo {
+      font-size: 1.2rem;
+      color: #666;
+      margin-top: -20px;
+    }
+    #tarjeta {
+      font-size: 8rem;
+      font-weight: bold;
+      color: #222;
+      line-height: 1;
+      transition: color 0.3s, transform 0.3s;
+      text-align: center;
+    }
+    #icono {
+      font-size: 6rem;
+      transition: transform 0.4s;
+    }
+    #ProtobjectPlusButton {
+      width: auto !important;
+      height: auto !important;
+      padding: 14px 24px !important;
+      font-size: 16px !important;
+      white-space: nowrap !important;
+      top: 20px !important;
+      left: 20px !important;
+      right: auto !important;
+      bottom: auto !important;
+      border-radius: 30px !important;
+    }
+    #ProtobjectPlusButton:after {
+      content: " Conectar teléfono";
+    }
+  </style>
+</head>
+<body>
+
+  <div id="titulo">Ejemplo 4 · Lector NFC</div>
+  <div id="subtitulo">Acerca una tarjeta al teléfono</div>
+
+  <div id="icono">💳</div>
+  <div id="tarjeta">—</div>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    // Cada nombre de tarjeta tiene su color e ícono, para que la
+    // pantalla cambie con personalidad al reconocer cada una.
+    const estilos = {
+      "Bip!":   { color: "#1d4ed8", icono: "🚌" },
+      "TUC":    { color: "#dc2626", icono: "🎓" },
+      "TNE":    { color: "#16a34a", icono: "🚌" },
+      "Carnet": { color: "#7c3aed", icono: "🪪" },
+      "Desconocida": { color: "#666", icono: "❓" }
+    };
+
+    Protobject.Core.onReceived((nombre) => {
+      const tarjetaEl = document.getElementById("tarjeta");
+      const iconoEl = document.getElementById("icono");
+      const estilo = estilos[nombre] || estilos["Desconocida"];
+
+      tarjetaEl.textContent = nombre;
+      tarjetaEl.style.color = estilo.color;
+      iconoEl.textContent = estilo.icono;
+
+      // Pequeño "pop" al detectar
+      iconoEl.style.transform = "scale(1.3)";
+      tarjetaEl.style.transform = "scale(1.1)";
+      setTimeout(() => {
+        iconoEl.style.transform = "scale(1)";
+        tarjetaEl.style.transform = "scale(1)";
+      }, 200);
+    });
+  </script>
+
+  <script src="config.js"></script>
+
+</body>
+</html>

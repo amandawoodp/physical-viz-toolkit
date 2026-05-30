@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Sensor NFC</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: sans-serif; padding: 20px; margin: 0;
+      background: #fafafa; text-align: center;
+    }
+    h2 { font-size: 20px; margin-top: 10px; }
+    #instr {
+      font-size: 18px; margin: 20px 0; color: #333;
+      min-height: 3em;
+    }
+    #lectura {
+      font-size: 24px; margin: 15px 0; color: #2a7; font-weight: bold;
+      word-break: break-all;
+    }
+    button {
+      display: block; width: 100%;
+      padding: 18px; font-size: 18px; font-weight: bold;
+      border: none; border-radius: 14px;
+      margin: 10px 0;
+      touch-action: manipulation;
+    }
+    #iniciar { background: #e63946; color: white; }
+    #aprender { background: #2a7; color: white; }
+    #aprender:disabled { background: #ccc; }
+    #reset { background: #f4f4f4; color: #333; border: 1px solid #ccc; }
+    .lista {
+      background: white; border-radius: 10px; padding: 15px;
+      margin: 15px 0; text-align: left;
+    }
+    .lista div { padding: 6px 0; font-size: 15px; }
+    .lista .ok { color: #2a7; }
+    .lista .vacio { color: #aaa; }
+  </style>
+</head>
+<body>
+
+  <h2>📡 Lector NFC</h2>
+
+  <button id="iniciar">INICIAR LECTOR NFC</button>
+
+  <div id="instr">Toca "Iniciar lector" y permite el escaneo.</div>
+
+  <div id="lectura">—</div>
+
+  <div class="lista" id="aprendidas">
+    <strong>Tarjetas aprendidas:</strong>
+    <div id="estado-bip" class="vacio">Bip! — sin aprender</div>
+    <div id="estado-tuc" class="vacio">TUC — sin aprender</div>
+    <div id="estado-tne" class="vacio">TNE — sin aprender</div>
+    <div id="estado-carnet" class="vacio">Carnet — sin aprender</div>
+  </div>
+
+  <button id="aprender" disabled>📚 ENTRAR EN MODO APRENDIZAJE</button>
+  <button id="reset">🗑️ BORRAR TARJETAS APRENDIDAS</button>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    const btnIniciar = document.getElementById("iniciar");
+    const btnAprender = document.getElementById("aprender");
+    const btnReset = document.getElementById("reset");
+    const instr = document.getElementById("instr");
+    const lectura = document.getElementById("lectura");
+
+    // Las 4 tarjetas que queremos diferenciar. Cambia los nombres
+    // o agrega/quita según necesites.
+    const TARJETAS = ["Bip!", "TUC", "TNE", "Carnet"];
+
+    // Cargar IDs ya aprendidos desde el almacenamiento local del navegador,
+    // así no hay que reaprender cada vez que se recarga la página.
+    let tarjetas = JSON.parse(localStorage.getItem("nfcTarjetas") || "{}");
+
+    // Mapeo de nombre → id en spans, para actualizar la UI
+    const estadoIds = {
+      "Bip!": "estado-bip",
+      "TUC": "estado-tuc",
+      "TNE": "estado-tne",
+      "Carnet": "estado-carnet"
+    };
+
+    // Modo aprendizaje: cuando es null estamos en modo uso normal.
+    // Cuando es el nombre de una tarjeta, la siguiente lectura se
+    // asociará a ese nombre.
+    let modoAprendiendo = null;
+
+    function actualizarLista() {
+      for (const nombre of TARJETAS) {
+        const el = document.getElementById(estadoIds[nombre]);
+        if (tarjetas[nombre]) {
+          el.textContent = nombre + " — ✓ aprendida";
+          el.className = "ok";
+        } else {
+          el.textContent = nombre + " — sin aprender";
+          el.className = "vacio";
+        }
+      }
+    }
+    actualizarLista();
+
+    // ---- INICIAR NFC ----
+    // Hay que llamar a NFC.start() DESDE UN BOTÓN porque el navegador
+    // exige interacción del usuario para mostrar el popup de permiso.
+    btnIniciar.addEventListener("click", () => {
+      Protobject.NFC.start()
+        .then(() => {
+          instr.textContent = "Lector activo. Acerca una tarjeta NFC.";
+          btnIniciar.style.display = "none";
+          btnAprender.disabled = false;
+        })
+        .catch((err) => {
+          instr.textContent = "Error: " + err + ". Recuerda que NFC solo funciona en Chrome para Android.";
+        });
+    });
+
+    // ---- MODO APRENDIZAJE ----
+    // Ciclamos por cada tarjeta no aprendida: usuario acerca → guardamos
+    // su ID → pasamos a la siguiente. Al terminar, vuelve a modo uso.
+    function siguienteAprender() {
+      const faltante = TARJETAS.find(n => !tarjetas[n]);
+      if (!faltante) {
+        modoAprendiendo = null;
+        instr.textContent = "✓ Todas las tarjetas aprendidas. Acércalas para identificarlas.";
+        btnAprender.textContent = "📚 REAPRENDER";
+        return;
+      }
+      modoAprendiendo = faltante;
+      instr.textContent = "Acerca tu " + faltante + " al teléfono...";
+    }
+
+    btnAprender.addEventListener("click", () => {
+      // Reseteamos para enseñar todo desde cero (si ya había aprendidas,
+      // se conservan; el flujo solo enseña las que faltan).
+      siguienteAprender();
+    });
+
+    // ---- BORRAR ----
+    btnReset.addEventListener("click", () => {
+      if (confirm("¿Borrar todas las tarjetas aprendidas?")) {
+        tarjetas = {};
+        localStorage.removeItem("nfcTarjetas");
+        actualizarLista();
+        instr.textContent = "Tarjetas borradas. Toca 'Entrar en modo aprendizaje' para empezar.";
+        btnAprender.textContent = "📚 ENTRAR EN MODO APRENDIZAJE";
+      }
+    });
+
+    // ---- LECTURA DE TARJETAS ----
+    Protobject.NFC.onData((id) => {
+      if (id === "err: no compatible") {
+        lectura.textContent = "Tarjeta no compatible";
+        return;
+      }
+
+      lectura.textContent = "ID: " + id;
+
+      if (modoAprendiendo !== null) {
+        // En modo aprendizaje: guardamos esta lectura como la tarjeta actual
+        tarjetas[modoAprendiendo] = id;
+        localStorage.setItem("nfcTarjetas", JSON.stringify(tarjetas));
+        actualizarLista();
+        instr.textContent = "✓ " + modoAprendiendo + " aprendida.";
+        setTimeout(siguienteAprender, 800);
+      } else {
+        // En modo uso: buscamos el nombre asociado a este ID
+        const nombre = Object.keys(tarjetas).find(k => tarjetas[k] === id);
+        const nombreFinal = nombre || "Desconocida";
+        instr.textContent = "Última detectada: " + nombreFinal;
+        // Enviar el nombre al PC (evento semántico, no el ID crudo)
+        Protobject.Core.send(nombreFinal).to("index.html");
+      }
+    });
+  </script>
+
+  <script src="config.js"></script>
+</body>
+</html>

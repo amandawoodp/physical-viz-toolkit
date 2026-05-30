@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Sensor de orientación</title>
+  <style>
+    body {
+      margin: 0; height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: sans-serif; background: #f4f4f4;
+      gap: 30px;
+      transition: background 0.5s;
+    }
+    body.on { background: #d1fae5; }
+    body.off { background: #fee2e2; }
+
+    #titulo {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #2a7;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    #subtitulo {
+      font-size: 1.2rem;
+      color: #666;
+      margin-top: -20px;
+    }
+    #estado {
+      font-size: 18rem;
+      font-weight: bold;
+      line-height: 1;
+      transition: color 0.3s, transform 0.3s;
+    }
+    body.on #estado { color: #16a34a; }
+    body.off #estado { color: #dc2626; }
+
+    #ProtobjectPlusButton {
+      width: auto !important;
+      height: auto !important;
+      padding: 14px 24px !important;
+      font-size: 16px !important;
+      white-space: nowrap !important;
+      top: 20px !important;
+      left: 20px !important;
+      right: auto !important;
+      bottom: auto !important;
+      border-radius: 30px !important;
+    }
+    #ProtobjectPlusButton:after {
+      content: " Conectar teléfono";
+    }
+  </style>
+</head>
+<body>
+
+  <div id="titulo">Ejemplo 5 · Sensor de orientación</div>
+  <div id="subtitulo">Abre y cierra el libro</div>
+
+  <div id="estado">—</div>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    let primerMensaje = false;
+
+    // El teléfono nos envía un string: "ON" o "OFF"
+    Protobject.Core.onReceived((estado) => {
+      const estadoEl = document.getElementById("estado");
+      estadoEl.textContent = estado;
+
+      // Cambiar la clase del body según el estado, para que el fondo
+      // y el color del texto cambien gracias al CSS.
+      document.body.classList.remove("on", "off");
+      document.body.classList.add(estado.toLowerCase());
+
+      // Pop al cambiar
+      estadoEl.style.transform = "scale(1.15)";
+      setTimeout(() => { estadoEl.style.transform = "scale(1)"; }, 250);
+
+      if (!primerMensaje) {
+        primerMensaje = true;
+        document.getElementById("subtitulo").textContent = "✓ Teléfono conectado · abre y cierra el libro";
+        document.getElementById("subtitulo").style.color = "#2a7";
+      }
+    });
+  </script>
+
+  <script src="config.js"></script>
+
+</body>
+</html>
