@@ -20,12 +20,6 @@
     const instr = document.getElementById("instr");
     const valorEl = document.getElementById("valor");
 
-    // ---- FORZAR CÁMARA TRASERA EN iPhone ----
-    // En iOS los índices de cámara no son confiables.
-    // 1) Pedimos permiso con facingMode "environment" para que
-    //    el sistema revele los nombres reales de cada cámara.
-    // 2) Enumeramos las cámaras y buscamos la trasera por nombre.
-    // 3) Pasamos su índice REAL a Protobject.Aruco.start().
     async function elegirYIniciar() {
       try {
         const tmp = await navigator.mediaDevices.getUserMedia({
@@ -58,17 +52,12 @@
     }
     elegirYIniciar();
 
-    // ---- ESTADO DE CALIBRACIÓN ----
-    let xMin = null;          // Y cuando el cubo está al extremo "izquierdo" del canal
-    let xMax = null;          // Y cuando el cubo está al extremo "derecho" del canal
-    let etapa = "izq";        // "izq" → "der" → "listo"
-    let ultimaX = null;       // última coordenada leída del cubo
-    let binAnterior = null;   // última casilla enviada (0, 1 o 2)
+    let xMin = null;
+    let xMax = null;
+    let etapa = "izq";
+    let ultimaX = null;
+    let binAnterior = null;
 
-    // ---- LECTURA DE MARCADORES ----
-    // Protobject entrega todos los marcadores visibles. Tomamos el
-    // de mayor tamaño (la cara más cercana a la cámara). Así el
-    // slider funciona con cualquier cara del cubo.
     Protobject.Aruco.onData((data) => {
       const ids = Object.keys(data);
       if (ids.length === 0) return;
@@ -78,8 +67,7 @@
         if (data[id].size > data[mejorId].size) mejorId = id;
       }
 
-      // Usamos Y porque con el teléfono horizontal el canal
-      // corre a lo largo del eje Y de la cámara, no del X.
+      // Con el teléfono horizontal el canal corre a lo largo del eje Y
       ultimaX = data[mejorId].position.y;
 
       if (etapa !== "listo") {
@@ -87,17 +75,13 @@
         return;
       }
 
-      // Normalizar al rango calibrado [0, 1]
       let t = (ultimaX - xMin) / (xMax - xMin);
       t = Math.max(0, Math.min(1, t));
 
-      // Mapear a 3 casillas discretas: 0, 1, 2
       const bin = Math.min(2, Math.floor(t * 3));
 
-      // Mostrar en el teléfono lo que estamos calculando (depuración)
       valorEl.textContent = "bin: " + bin + " (t=" + t.toFixed(2) + ")";
 
-      // Enviar SOLO cuando cambia la casilla: ese es el evento semántico.
       if (bin !== binAnterior) {
         binAnterior = bin;
         Protobject.Core.send(bin).to("index.html");
@@ -105,7 +89,6 @@
       }
     });
 
-    // ---- CALIBRACIÓN POR TOQUE ----
     document.body.addEventListener("click", () => {
       if (ultimaX === null) {
         instr.textContent = "Aún no veo el cubo. Apunta bien la cámara.";
