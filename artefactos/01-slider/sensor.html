@@ -101,6 +101,7 @@
 
   <button id="btnCalibrar">Calibrar extremo 0</button>
   <button id="btnReiniciar" class="secundario">Reiniciar calibración</button>
+  <button id="btnFlash" class="secundario">Intentar activar flash</button>
 
   <div id="detalle">Buscando cubo ArUco...</div>
   <div id="estado">Lecturas: 0</div>
@@ -114,6 +115,7 @@
     const estadoEl = document.getElementById("estado");
     const btnCalibrar = document.getElementById("btnCalibrar");
     const btnReiniciar = document.getElementById("btnReiniciar");
+    const btnFlash = document.getElementById("btnFlash");
     const fill = document.getElementById("fill");
 
     const LECTURAS_MEDIANA = 5;
@@ -212,7 +214,80 @@
         height: 255
       });
     }
+    let flashActivo = false;
+let streamFlash = null;
 
+btnFlash.addEventListener("click", alternarFlash);
+
+btnFlash.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  alternarFlash();
+});
+
+async function alternarFlash() {
+  try {
+    if (flashActivo) {
+      apagarFlash();
+      return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      detalle.textContent = "Este navegador no permite controlar la cámara.";
+      return;
+    }
+
+    streamFlash = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+        advanced: [{ torch: true }]
+      },
+      audio: false
+    });
+
+    const track = streamFlash.getVideoTracks()[0];
+
+    if (!track) {
+      detalle.textContent = "No se encontró una cámara compatible con flash.";
+      return;
+    }
+
+    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+
+    if (!capabilities.torch) {
+      detalle.textContent =
+        "Este navegador no permite activar el flash. Usa más luz externa.";
+      apagarFlash();
+      return;
+    }
+
+    await track.applyConstraints({
+      advanced: [{ torch: true }]
+    });
+
+    flashActivo = true;
+    btnFlash.textContent = "Apagar flash";
+    btnFlash.classList.add("done");
+
+    detalle.textContent = "Flash activado. Si el ArUco deja de verse, apágalo.";
+
+  } catch (err) {
+    console.warn("No se pudo activar flash:", err);
+
+    detalle.textContent =
+      "No se pudo activar el flash desde el navegador. Usa luz externa sobre el cubo.";
+  }
+}
+
+function apagarFlash() {
+  if (streamFlash) {
+    streamFlash.getTracks().forEach(track => track.stop());
+    streamFlash = null;
+  }
+
+  flashActivo = false;
+  btnFlash.textContent = "Intentar activar flash";
+  btnFlash.classList.remove("done");
+}
     elegirYIniciar();
 
     // -----------------------------
