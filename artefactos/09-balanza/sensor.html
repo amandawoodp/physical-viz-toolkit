@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Sensor balanza</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: sans-serif; padding: 20px; margin: 0;
+      background: #fafafa; text-align: center;
+    }
+    #instr {
+      font-size: 20px; margin-top: 20px; color: #333;
+      min-height: 3em;
+    }
+    #valor {
+      font-size: 50px; margin: 25px 0; color: #2a7; font-weight: bold;
+    }
+    button {
+      display: block; width: 100%;
+      font-weight: bold;
+      border: none; border-radius: 14px;
+      margin: 12px 0;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+    #permiso {
+      padding: 18px; font-size: 18px;
+      background: #e63946; color: white;
+    }
+    #calibrar {
+      padding: 22px; font-size: 20px;
+      background: #2a7; color: white;
+    }
+    #calibrar:active { background: #1a5; }
+    #calibrar.done { background: #94d2bd; }
+  </style>
+</head>
+<body>
+
+  <button id="permiso">PEDIR PERMISO DE ORIENTACIÓN</button>
+
+  <div id="instr">Fija el teléfono al eje central de la balanza.</div>
+
+  <div id="valor">—</div>
+
+  <button id="calibrar" style="display:none">⚖️ CALIBRAR EQUILIBRIO (0)</button>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    const instr = document.getElementById("instr");
+    const valorEl = document.getElementById("valor");
+    const btnPermiso = document.getElementById("permiso");
+    const btnCalibrar = document.getElementById("calibrar");
+
+    // ESTADO
+    let ultimoGamma = null;     // inclinación lateral izquierda-derecha
+    let equilibrio = null;
+    let desbalanceAnterior = null;
+
+    // Cuántos grados de inclinación equivalen al 100% de desbalance.
+    // Súbelo si la balanza se inclina poco y quieres que sea más
+    // sensible. Bájalo si se "satura" rápido.
+    const GRADOS_AL_100 = 20;
+
+    const UMBRAL = 2;
+    const SUAVIZADO = 0.4;
+    let desbalanceSuavizado = 0;
+
+    // ---- LISTENER ----
+    // La balanza se inclina lateralmente cuando un platillo pesa más.
+    // El eje 'gamma' del DOM mide exactamente esa inclinación lateral
+    // (izquierda-derecha). Si tu montaje tiene el teléfono parado en
+    // vez de acostado, cambia 'gamma' por 'beta' (4 ocurrencias abajo).
+    function handler(event) {
+      if (event.gamma === null) return;
+      ultimoGamma = event.gamma;
+
+      if (equilibrio === null) {
+        valorEl.textContent = Math.round(ultimoGamma) + "°";
+        return;
+      }
+
+      const dif = ultimoGamma - equilibrio;
+
+      let pct = (dif / GRADOS_AL_100) * 100;
+      pct = Math.max(-100, Math.min(100, pct));
+
+      desbalanceSuavizado = desbalanceSuavizado * SUAVIZADO + pct * (1 - SUAVIZADO);
+
+      const desbalance = Math.round(desbalanceSuavizado);
+      valorEl.textContent = desbalance > 0 ? "+" + desbalance : desbalance;
+
+      if (desbalanceAnterior === null || Math.abs(desbalance - desbalanceAnterior) >= UMBRAL) {
+        desbalanceAnterior = desbalance;
+        Protobject.Core.send(desbalance).to("index.html");
+      }
+    }
+
+    // ---- PERMISO iOS ----
+    btnPermiso.addEventListener("click", async () => {
+      try {
+        if (typeof DeviceOrientationEvent !== "undefined" &&
+            typeof DeviceOrientationEvent.requestPermission === "function") {
+          const r = await DeviceOrientationEvent.requestPermission();
+          if (r === "granted") iniciar();
+          else instr.textContent = "Permiso denegado. Recarga para reintentar.";
+        } else {
+          iniciar();
+        }
+      } catch (err) {
+        instr.textContent = "Error: " + err.message;
+      }
+    });
+
+    function iniciar() {
+      btnPermiso.style.display = "none";
+      btnCalibrar.style.display = "block";
+      instr.textContent = "Pon la balanza en equilibrio (platillos vacíos) y toca CALIBRAR.";
+      window.addEventListener("deviceorientationabsolute", handler, true);
+      window.addEventListener("deviceorientation", handler, true);
+    }
+
+    // ---- CALIBRACIÓN: un solo toque ----
+    function calibrar(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      if (ultimoGamma === null) {
+        instr.textContent = "Esperando lectura del sensor...";
+        return;
+      }
+      equilibrio = ultimoGamma;
+      desbalanceAnterior = 0;
+      desbalanceSuavizado = 0;
+      btnCalibrar.textContent = "🔄 RECALIBRAR EQUILIBRIO";
+      btnCalibrar.classList.add("done");
+      instr.textContent = "✓ Calibrado. Pon objetos en los platillos.";
+      Protobject.Core.send(0).to("index.html");
+    }
+
+    btnCalibrar.addEventListener("touchstart", calibrar);
+    btnCalibrar.addEventListener("click", calibrar);
+
+    if (typeof DeviceOrientationEvent === "undefined" ||
+        typeof DeviceOrientationEvent.requestPermission !== "function") {
+      iniciar();
+    }
+  </script>
+
+  <script src="config.js"></script>
+</body>
+</html>

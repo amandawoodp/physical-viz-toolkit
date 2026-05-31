@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Superficie táctil (HandSensor)</title>
+  <style>
+    body {
+      margin: 0; height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: sans-serif; background: #f4f4f4;
+      gap: 25px;
+    }
+    #titulo {
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: #2a7;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    #subtitulo {
+      font-size: 1.1rem;
+      color: #666;
+      margin-top: -15px;
+    }
+    #estado-conexiones {
+      display: flex; gap: 30px;
+      font-size: 1rem;
+    }
+    .conexion { padding: 8px 14px; border-radius: 20px; background: #e5e7eb; color: #6b7280; }
+    .conexion.ok { background: #d1fae5; color: #065f46; }
+
+    /* Las tres zonas activas */
+    #zonas {
+      display: flex; gap: 30px; margin-top: 20px;
+    }
+    .zona {
+      width: 260px; height: 260px;
+      background: #fff;
+      border: 5px solid #d1d5db;
+      border-radius: 24px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-size: 2.4rem; font-weight: bold;
+      color: #374151;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .zona.hover {
+      border-color: #facc15;
+      background: #fef9c3;
+    }
+    .zona.activa {
+      border-color: #16a34a;
+      background: #d1fae5;
+      transform: scale(1.05);
+      color: #065f46;
+    }
+
+    #estado-fusion {
+      font-size: 1.2rem; color: #6b7280; margin-top: 10px;
+      min-height: 1.5em;
+    }
+
+    #ProtobjectPlusButton {
+      width: auto !important;
+      height: auto !important;
+      padding: 14px 24px !important;
+      font-size: 16px !important;
+      white-space: nowrap !important;
+      top: 20px !important;
+      left: 20px !important;
+      right: auto !important;
+      bottom: auto !important;
+      border-radius: 30px !important;
+    }
+    #ProtobjectPlusButton:after {
+      content: " Conectar teléfonos";
+    }
+  </style>
+</head>
+<body>
+
+  <div id="titulo">Ejemplo 7 · Superficie táctil</div>
+  <div id="subtitulo">Toca con el dedo una de las tres zonas</div>
+
+  <div id="estado-conexiones">
+    <div class="conexion" id="conCenital">📱 Cenital: desconectado</div>
+    <div class="conexion" id="conFrontal">📱 Frontal: desconectado</div>
+  </div>
+
+  <div id="zonas">
+    <div class="zona" id="zonaA">A</div>
+    <div class="zona" id="zonaB">B</div>
+    <div class="zona" id="zonaC">C</div>
+  </div>
+
+  <div id="estado-fusion">Esperando datos...</div>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    // ===================================================================
+    // CONFIGURACIÓN DE LAS ZONAS ACTIVAS
+    // Cada zona es un rango en X normalizado (0 a 1) del campo de la
+    // cámara CENITAL. Si tu cámara ve el espacio dividido en 3 partes
+    // iguales horizontalmente, estos rangos están bien.
+    // ===================================================================
+    const ZONAS = {
+      A: { xMin: 0.05, xMax: 0.35, yMin: 0.20, yMax: 0.80, color: "#dc2626" },
+      B: { xMin: 0.35, xMax: 0.65, yMin: 0.20, yMax: 0.80, color: "#16a34a" },
+      C: { xMin: 0.65, xMax: 0.95, yMin: 0.20, yMax: 0.80, color: "#1d4ed8" }
+    };
+
+    // ===================================================================
+    // UMBRAL de altura: el teléfono FRONTAL nos manda la altura Z
+    // normalizada del dedo (0 = arriba del frame, 1 = abajo del frame).
+    // "Cerca de la mesa" es cuando Z > UMBRAL_ALTURA.
+    // Ajustable según cómo quede tu Base A1.
+    // ===================================================================
+    const UMBRAL_ALTURA = 0.7;
+
+    // ===================================================================
+    // TIEMPO MÁXIMO entre lecturas para considerar "simultáneas"
+    // Si el cenital ve el dedo en zona B pero el frontal no ve el dedo
+    // cerca de la mesa en los últimos 250ms, no cuenta como toque.
+    // ===================================================================
+    const VENTANA_MS = 250;
+
+    // Estado
+    let ultimaPosCenital = null;    // { x, y, t }
+    let ultimaAlturaFrontal = null; // { z, t }
+    let zonaActivaActual = null;
+
+    const zonaEls = {
+      A: document.getElementById("zonaA"),
+      B: document.getElementById("zonaB"),
+      C: document.getElementById("zonaC")
+    };
+    const estadoFusion = document.getElementById("estado-fusion");
+
+    function detectarZona(x, y) {
+      for (const nombre in ZONAS) {
+        const z = ZONAS[nombre];
+        if (x >= z.xMin && x <= z.xMax && y >= z.yMin && y <= z.yMax) {
+          return nombre;
+        }
+      }
+      return null;
+    }
+
+    function actualizar() {
+      const ahora = Date.now();
+
+      // Si alguna lectura es muy vieja, no hay toque válido
+      if (!ultimaPosCenital || !ultimaAlturaFrontal) {
+        return;
+      }
+      if (ahora - ultimaPosCenital.t > VENTANA_MS ||
+          ahora - ultimaAlturaFrontal.t > VENTANA_MS) {
+        limpiarZonas();
+        estadoFusion.textContent = "Buscando dedo en ambas cámaras...";
+        return;
+      }
+
+      const zonaCenital = detectarZona(ultimaPosCenital.x, ultimaPosCenital.y);
+      const cercaMesa = ultimaAlturaFrontal.z >= UMBRAL_ALTURA;
+
+      limpiarZonas();
+
+      // Si el dedo está en una zona del cenital, marcarla como "hover"
+      if (zonaCenital) {
+        zonaEls[zonaCenital].classList.add("hover");
+      }
+
+      // Confirmación de TOQUE: zona detectada + frontal lo ve bajo
+      if (zonaCenital && cercaMesa) {
+        zonaEls[zonaCenital].classList.remove("hover");
+        zonaEls[zonaCenital].classList.add("activa");
+        zonaActivaActual = zonaCenital;
+        estadoFusion.textContent = "✓ TOQUE confirmado en zona " + zonaCenital;
+        estadoFusion.style.color = "#16a34a";
+      } else if (zonaCenital) {
+        estadoFusion.textContent = "👆 Hover en " + zonaCenital + " — acerca el dedo a la mesa";
+        estadoFusion.style.color = "#92400e";
+      } else {
+        estadoFusion.textContent = "Mueve el dedo a una zona";
+        estadoFusion.style.color = "#6b7280";
+      }
+    }
+
+    function limpiarZonas() {
+      for (const k in zonaEls) {
+        zonaEls[k].classList.remove("hover", "activa");
+      }
+    }
+
+    // ===================================================================
+    // RECIBIR DATOS DE LOS DOS TELÉFONOS
+    // ===================================================================
+    Protobject.Core.onReceived((msg) => {
+      if (!msg || !msg.tipo) return;
+
+      if (msg.tipo === "cenital") {
+        ultimaPosCenital = { x: msg.x, y: msg.y, t: Date.now() };
+        document.getElementById("conCenital").textContent = "📱 Cenital: ✓ conectado";
+        document.getElementById("conCenital").classList.add("ok");
+      }
+      else if (msg.tipo === "frontal") {
+        ultimaAlturaFrontal = { z: msg.z, t: Date.now() };
+        document.getElementById("conFrontal").textContent = "📱 Frontal: ✓ conectado";
+        document.getElementById("conFrontal").classList.add("ok");
+      }
+
+      actualizar();
+    });
+
+    // Loop adicional por si una de las cámaras deja de mandar
+    setInterval(actualizar, 100);
+  </script>
+
+  <script src="config.js"></script>
+
+</body>
+</html>

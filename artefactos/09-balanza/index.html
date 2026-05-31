@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Balanza de datos</title>
+  <style>
+    body {
+      margin: 0; height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: sans-serif; background: #f4f4f4;
+      gap: 30px;
+      overflow: hidden;
+    }
+    #titulo {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #2a7;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    #subtitulo {
+      font-size: 1.2rem;
+      color: #666;
+      margin-top: -20px;
+    }
+    #balanza {
+      width: 700px;
+      height: 320px;
+      position: relative;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    #brazo {
+      width: 600px;
+      height: 18px;
+      background: #2a7;
+      border-radius: 8px;
+      position: absolute;
+      bottom: 140px;
+      left: 50px;
+      transform-origin: center center;
+      transform: rotate(0deg);
+      transition: transform 0.15s ease-out;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    #fulcro {
+      width: 0;
+      height: 0;
+      border-left: 40px solid transparent;
+      border-right: 40px solid transparent;
+      border-bottom: 80px solid #2a7;
+      position: absolute;
+      bottom: 60px;
+    }
+    .platillo {
+      position: absolute;
+      bottom: 20px;
+      width: 130px;
+      height: 130px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      font-weight: bold;
+      color: white;
+      text-align: center;
+      padding: 10px;
+      transition: bottom 0.15s ease-out;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+    #platilloIzq { left: 80px; background: #dc2626; }
+    #platilloDer { right: 80px; background: #1d4ed8; }
+
+    #estado {
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: #222;
+      height: 1.5em;
+      text-align: center;
+    }
+
+    #ProtobjectPlusButton {
+      width: auto !important;
+      height: auto !important;
+      padding: 14px 24px !important;
+      font-size: 16px !important;
+      white-space: nowrap !important;
+      top: 20px !important;
+      left: 20px !important;
+      right: auto !important;
+      bottom: auto !important;
+      border-radius: 30px !important;
+    }
+    #ProtobjectPlusButton:after {
+      content: " Conectar teléfono";
+    }
+  </style>
+</head>
+<body>
+
+  <div id="titulo">Ejemplo 9 · Balanza de datos</div>
+  <div id="subtitulo">Equilibra los dos platillos</div>
+
+  <div id="balanza">
+    <div id="fulcro"></div>
+    <div id="brazo"></div>
+    <div class="platillo" id="platilloIzq">DEMANDA</div>
+    <div class="platillo" id="platilloDer">OFERTA</div>
+  </div>
+
+  <div id="estado">⚖️ En equilibrio</div>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    // -------------------------------------------------------------
+    // NOMBRES DE LOS PLATILLOS — cámbialos según tu narrativa
+    // -------------------------------------------------------------
+    const NOMBRE_IZQ = "DEMANDA";
+    const NOMBRE_DER = "OFERTA";
+    // -------------------------------------------------------------
+
+    document.getElementById("platilloIzq").textContent = NOMBRE_IZQ;
+    document.getElementById("platilloDer").textContent = NOMBRE_DER;
+
+    const brazo = document.getElementById("brazo");
+    const estadoEl = document.getElementById("estado");
+    const platilloIzq = document.getElementById("platilloIzq");
+    const platilloDer = document.getElementById("platilloDer");
+    const subtitulo = document.getElementById("subtitulo");
+
+    let primerMensaje = false;
+
+    // El teléfono envía un número entre -100 y +100:
+    //   0    → equilibrio
+    //   < 0  → pesa más el lado izquierdo (DEMANDA)
+    //   > 0  → pesa más el lado derecho (OFERTA)
+    Protobject.Core.onReceived((desbalance) => {
+      const d = Math.max(-100, Math.min(100, desbalance));
+
+      // Inclinar el brazo visualmente
+      const angulo = d * 0.25;
+      brazo.style.transform = "rotate(" + angulo + "deg)";
+
+      // Los platillos suben y bajan con el brazo
+      const offsetIzq = -d * 1.2;
+      const offsetDer = d * 1.2;
+      platilloIzq.style.bottom = (20 + offsetIzq) + "px";
+      platilloDer.style.bottom = (20 + offsetDer) + "px";
+
+      // Texto de estado
+      if (Math.abs(d) < 5) {
+        estadoEl.textContent = "⚖️ En equilibrio";
+        estadoEl.style.color = "#2a7";
+      } else if (d < 0) {
+        estadoEl.textContent = "← " + NOMBRE_IZQ + " pesa más (" + Math.abs(d) + "%)";
+        estadoEl.style.color = "#dc2626";
+      } else {
+        estadoEl.textContent = NOMBRE_DER + " pesa más (" + d + "%) →";
+        estadoEl.style.color = "#1d4ed8";
+      }
+
+      if (!primerMensaje) {
+        primerMensaje = true;
+        subtitulo.textContent = "✓ Teléfono conectado · pesa los datos";
+        subtitulo.style.color = "#2a7";
+      }
+    });
+  </script>
+
+  <script src="config.js"></script>
+
+</body>
+</html>

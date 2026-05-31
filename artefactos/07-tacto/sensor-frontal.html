@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Sensor frontal (Z)</title>
+  <style>
+    body {
+      font-family: sans-serif; padding: 15px; margin: 0;
+      background: #fafafa; text-align: center;
+    }
+    h2 { font-size: 18px; margin: 5px; }
+    #instr { font-size: 16px; color: #333; margin: 10px 0; }
+    #valor {
+      font-size: 28px; margin: 10px 0; color: #2a7; font-weight: bold;
+    }
+    #lecturas { font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+
+  <h2>📷 Cámara FRONTAL (altura Z)</h2>
+  <div id="instr">Altura del dedo sobre la mesa. Pon este teléfono en la Base A1.</div>
+  <div id="valor">—</div>
+  <div id="lecturas">Lecturas: 0</div>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    const valorEl = document.getElementById("valor");
+    const lecturasEl = document.getElementById("lecturas");
+    let contador = 0;
+
+    async function elegirYIniciar() {
+      try {
+        const tmp = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        tmp.getTracks().forEach(t => t.stop());
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const camaras = devices.filter(d => d.kind === "videoinput");
+        let idxTrasera = 0;
+        for (let i = 0; i < camaras.length; i++) {
+          const n = camaras[i].label.toLowerCase();
+          if (n.includes("back") || n.includes("posterior") ||
+              n.includes("rear") || n.includes("trasera")) {
+            idxTrasera = i;
+            break;
+          }
+        }
+        Protobject.HandSensor.start(150, idxTrasera);
+      } catch (err) {
+        Protobject.HandSensor.start(150, 0);
+      }
+
+      Protobject.HandSensor.showPreview({ top: 220, left: 10, width: 320, height: 240 });
+    }
+    elegirYIniciar();
+
+    Protobject.HandSensor.onData((data) => {
+      contador++;
+      lecturasEl.textContent = "Lecturas: " + contador;
+
+      let mano = null;
+      if (Array.isArray(data) && data.length > 0) mano = data[0];
+      else if (data && data.hands && data.hands.length > 0) mano = data.hands[0];
+
+      if (!mano) {
+        valorEl.textContent = "Sin mano detectada";
+        return;
+      }
+
+      let p = null;
+      if (mano.landmarks && mano.landmarks[8]) p = mano.landmarks[8];
+      else if (mano[8]) p = mano[8];
+      else if (mano.keypoints && mano.keypoints[8]) p = mano.keypoints[8];
+
+      if (!p || p.y === undefined) {
+        valorEl.textContent = "Estructura desconocida (mira consola)";
+        console.log("DATA frontal:", data);
+        return;
+      }
+
+      // En la cámara FRONTAL, la 'y' del frame representa la ALTURA del
+      // dedo respecto al suelo: y=0 (arriba del frame) = dedo arriba,
+      // y=1 (abajo del frame) = dedo cerca de la mesa.
+      let y = p.y;
+      if (y > 1) y = y / 480;
+
+      // Llamamos esto "z" porque conceptualmente es la altura
+      valorEl.textContent = "altura z: " + y.toFixed(2);
+
+      Protobject.Core.send({ tipo: "frontal", z: y }).to("index.html");
+    });
+  </script>
+
+  <script src="config.js"></script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Sensor cenital (X, Y)</title>
+  <style>
+    body {
+      font-family: sans-serif; padding: 15px; margin: 0;
+      background: #fafafa; text-align: center;
+    }
+    h2 { font-size: 18px; margin: 5px; }
+    #instr { font-size: 16px; color: #333; margin: 10px 0; }
+    #valor {
+      font-size: 28px; margin: 10px 0; color: #2a7; font-weight: bold;
+    }
+    #lecturas { font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+
+  <h2>📷 Cámara CENITAL (X, Y)</h2>
+  <div id="instr">Posición plana del dedo. Pon este teléfono en la Base A2.</div>
+  <div id="valor">—</div>
+  <div id="lecturas">Lecturas: 0</div>
+
+  <script src="https://app.protobject.com/framework/p.js"></script>
+
+  <script>
+    const valorEl = document.getElementById("valor");
+    const lecturasEl = document.getElementById("lecturas");
+    let contador = 0;
+
+    // ---- Forzar cámara trasera en iPhone (misma técnica del slider) ----
+    async function elegirYIniciar() {
+      try {
+        const tmp = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        tmp.getTracks().forEach(t => t.stop());
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const camaras = devices.filter(d => d.kind === "videoinput");
+        let idxTrasera = 0;
+        for (let i = 0; i < camaras.length; i++) {
+          const n = camaras[i].label.toLowerCase();
+          if (n.includes("back") || n.includes("posterior") ||
+              n.includes("rear") || n.includes("trasera")) {
+            idxTrasera = i;
+            break;
+          }
+        }
+        Protobject.HandSensor.start(150, idxTrasera);
+      } catch (err) {
+        Protobject.HandSensor.start(150, 0);
+      }
+
+      Protobject.HandSensor.showPreview({ top: 220, left: 10, width: 320, height: 240 });
+    }
+    elegirYIniciar();
+
+    // ---- Leer la mano ----
+    // El HandSensor entrega un array (o similar) con manos detectadas.
+    // Cada mano tiene "landmarks": 21 puntos. El landmark 8 es la punta
+    // del dedo índice. Sus coordenadas x e y vienen normalizadas (0-1)
+    // dentro del frame de la cámara.
+    Protobject.HandSensor.onData((data) => {
+      contador++;
+      lecturasEl.textContent = "Lecturas: " + contador;
+
+      // La estructura exacta puede variar según la versión de Protobject.
+      // Intentamos varios formatos y mostramos en consola para depurar.
+      let mano = null;
+      if (Array.isArray(data) && data.length > 0) mano = data[0];
+      else if (data && data.hands && data.hands.length > 0) mano = data.hands[0];
+
+      if (!mano) {
+        valorEl.textContent = "Sin mano detectada";
+        return;
+      }
+
+      // Buscamos el landmark 8 (punta del índice) en distintas estructuras
+      let p = null;
+      if (mano.landmarks && mano.landmarks[8]) p = mano.landmarks[8];
+      else if (mano[8]) p = mano[8];
+      else if (mano.keypoints && mano.keypoints[8]) p = mano.keypoints[8];
+
+      if (!p || p.x === undefined) {
+        valorEl.textContent = "Estructura desconocida (mira consola)";
+        console.log("DATA cenital:", data);
+        return;
+      }
+
+      // Si x viene en píxeles en vez de normalizado, lo normalizamos
+      // asumiendo un frame típico de 640x480. Mejor: averiguar tamaño real.
+      let x = p.x, y = p.y;
+      if (x > 1) x = x / 640;
+      if (y > 1) y = y / 480;
+
+      valorEl.textContent = "x: " + x.toFixed(2) + "  y: " + y.toFixed(2);
+
+      // Enviar al PC
+      Protobject.Core.send({ tipo: "cenital", x: x, y: y }).to("index.html");
+    });
+  </script>
+
+  <script src="config.js"></script>
+</body>
+</html>
