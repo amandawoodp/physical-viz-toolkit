@@ -56,24 +56,22 @@
     const btnCalibrar = document.getElementById("calibrar");
 
     // ESTADO
-    let ultimoGamma = null;     // inclinación lateral izquierda-derecha
+    let ultimoGamma = null;
     let equilibrio = null;
     let desbalanceAnterior = null;
 
+    // ===================================================================
+    // SENSIBILIDAD DEL SENSOR
     // Cuántos grados de inclinación equivalen al 100% de desbalance.
-    // Súbelo si la balanza se inclina poco y quieres que sea más
-    // sensible. Bájalo si se "satura" rápido.
-    const GRADOS_AL_100 = 20;
+    // Antes era 20. Ahora 6 → el sensor es ~3 veces más sensible.
+    // Baja este valor si quieres más sensibilidad aún, sube si se satura.
+    // ===================================================================
+    const GRADOS_AL_100 = 6;
 
-    const UMBRAL = 2;
-    const SUAVIZADO = 0.4;
+    const UMBRAL = 1;
+    const SUAVIZADO = 0.3;
     let desbalanceSuavizado = 0;
 
-    // ---- LISTENER ----
-    // La balanza se inclina lateralmente cuando un platillo pesa más.
-    // El eje 'gamma' del DOM mide exactamente esa inclinación lateral
-    // (izquierda-derecha). Si tu montaje tiene el teléfono parado en
-    // vez de acostado, cambia 'gamma' por 'beta' (4 ocurrencias abajo).
     function handler(event) {
       if (event.gamma === null) return;
       ultimoGamma = event.gamma;
@@ -99,7 +97,6 @@
       }
     }
 
-    // ---- PERMISO iOS ----
     btnPermiso.addEventListener("click", async () => {
       try {
         if (typeof DeviceOrientationEvent !== "undefined" &&
@@ -123,7 +120,6 @@
       window.addEventListener("deviceorientation", handler, true);
     }
 
-    // ---- CALIBRACIÓN: un solo toque ----
     function calibrar(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       if (ultimoGamma === null) {
