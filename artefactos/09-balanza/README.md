@@ -1,6 +1,6 @@
 # Balanza de datos
 
-El usuario pone objetos en los dos platillos de una balanza física que tiene el teléfono fijado al eje central como fulcro. La pantalla del computador muestra una balanza animada que se inclina hacia el lado que pesa más, con un indicador del porcentaje de desbalance y el nombre del lado que está ganando peso.
+El usuario pone objetos en los dos platillos de una balanza física que tiene el teléfono fijado al eje central como fulcro. La pantalla del computador muestra una balanza animada que se inclina hacia el lado que pesa más, con un indicador del porcentaje de desbalance.
 
 ## Materiales
 
@@ -21,12 +21,25 @@ Este artefacto es el **ejemplo demostrativo obligatorio** de la Base C según la
 2. Atraviesa el teléfono con el eje Technic usando la Base C, dejando que pivote libremente.
 3. Cuelga los dos platillos de los extremos del brazo.
 4. Abre [la demo en vivo](https://amandawoodp.github.io/physical-viz-toolkit/artefactos/09-balanza/) en el computador.
-5. (Opcional) En `index.html`, cambia las variables `NOMBRE_IZQ` y `NOMBRE_DER` por los nombres de tus dos categorías ("DEMANDA"/"OFERTA", "ANTES"/"DESPUÉS", etc).
-6. Click en "+ Conectar teléfono". Aparece un código QR.
-7. Escanea el QR con el iPhone/Android.
-8. **Permiso de orientación (iOS)**: aparecerá un botón rojo. Tócalo y permite el acceso.
-9. **Calibración de un toque**: pon la balanza en equilibrio (platillos vacíos o con pesos iguales) y toca **⚖️ CALIBRAR EQUILIBRIO**.
-10. Pon objetos en un platillo. La balanza física se inclina y la pantalla del PC refleja el desbalance en tiempo real.
+5. Click en "+ Conectar teléfono". Aparece un código QR.
+6. Escanea el QR con el iPhone/Android.
+7. **Permiso de orientación (iOS)**: aparecerá un botón rojo. Tócalo y permite el acceso.
+8. **Calibración de tres pasos** (ver sección siguiente).
+9. Pon objetos en un platillo. La balanza física se inclina y la pantalla del PC refleja el desbalance en tiempo real.
+
+## Calibración de tres pasos
+
+La balanza se autocalibra al rango físico real de tu montaje. Esto significa que aunque tu balanza solo se incline ±5° en total, la pantalla del PC siempre va a cubrir todo el rango -100% a +100%.
+
+**Paso 1 — Equilibrio**: Pon la balanza con ambos platillos vacíos (o con pesos iguales). Toca el botón. Ese ángulo se guarda como "cero".
+
+**Paso 2 — Máximo a la izquierda**: Pon objetos solo en el platillo izquierdo hasta que la balanza llegue a su máxima inclinación física de ese lado. Toca el botón. Ese ángulo se guarda como "-100%".
+
+**Paso 3 — Máximo a la derecha**: Saca los objetos del izquierdo y ponlos en el derecho hasta la máxima inclinación. Toca el botón. Ese ángulo se guarda como "+100%".
+
+A partir de ese momento, cualquier inclinación intermedia se mapea proporcionalmente al rango calibrado.
+
+Si quieres recalibrar (porque cambiaste los platillos, moviste la balanza o quieres ajustarla a otra escena), toca "↺ Reiniciar calibración" y vuelve a hacer los tres pasos.
 
 ## Sensor utilizado
 
@@ -36,21 +49,30 @@ Cuando la balanza se inclina hacia un lado, el teléfono que está incorporado a
 
 ## Sensor y mapeo de datos
 
-`event.gamma` del DOM → diferencia respecto al equilibrio calibrado → normalización a porcentaje [-100..+100] → suavizado exponencial → enviado al PC solo cuando cambia más de 2%.
+`event.gamma` del DOM → diferencia respecto al equilibrio calibrado → normalización proporcional al rango izquierda/derecha calibrado → aplicación de zona muerta (anti-temblor) → suavizado exponencial → enviado al PC solo cuando cambia más de 2%.
 
 El estudiante final recibe un evento semántico: un número con signo que indica qué lado pesa más y por cuánto.
+
+## Parámetros de sensibilidad
+
+Tres constantes en `sensor.html` controlan el comportamiento del sensor. Si necesitas afinar el artefacto en tu setup físico, estos son los valores que ajustar:
+
+- **`ZONA_MUERTA = 15`**: Si la inclinación es menor al 15% del rango calibrado, se considera equilibrio (cero). Esto resuelve el problema de "nunca alcanza el cero" por temblor del fulcro o pequeños desequilibrios físicos. Súbelo (a 20 o 25) si tu balanza nunca llega al equilibrio incluso vacía. Bájalo si necesitas más sensibilidad cerca del cero.
+
+- **`SUAVIZADO = 0.7`**: Filtra las micro-vibraciones del fulcro. Valores más altos = respuesta más lenta y estable. Valores más bajos (0.3 a 0.5) = respuesta más rápida pero más nerviosa.
+
+- **`UMBRAL = 2`**: Solo se envían al PC cambios mayores al 2%. Súbelo si la pantalla se mueve demasiado.
 
 ## Usos típicos
 
 - **Comparación física de magnitudes** entre dos datasets: "¿pesa más esta categoría o esta otra?"
-- **Narrativa visual**: el visitante carga el platillo de "lado A" con objetos y observa cómo la balanza física y la pantalla se inclinan al mismo tiempo.
+- **Narrativa visual**: el visitante carga el platillo de un lado con objetos y observa cómo la balanza física y la pantalla se inclinan al mismo tiempo.
 - **Decisión interactiva**: dos opciones, el visitante pone monedas en la que prefiere, y al final la balanza muestra la elección colectiva.
 
 ## Notas
 
-- Si el teléfono está **parado verticalmente** (lado corto paralelo al brazo) en lugar de acostado, el eje principal cambia: reemplaza las 4 apariciones de `gamma` por `beta` en `sensor.html`.
-- Requiere calibración cada vez que se monta o reorienta la balanza.
-- El parámetro `GRADOS_AL_100` en `sensor.html` define qué inclinación equivale al 100% de desbalance. Si tu balanza se inclina poco con objetos livianos, baja este valor (más sensible). Si se satura rápido, súbelo.
+- Si el teléfono está **parado verticalmente** (lado corto paralelo al brazo) en lugar de acostado, el eje principal cambia: reemplaza las apariciones de `gamma` por `beta` en `sensor.html`.
+- La calibración es persistente solo durante la sesión: si recargas la página o reconectas el teléfono, hay que volver a calibrar.
 - El sensor de orientación es menos preciso cerca de objetos metálicos grandes.
 - El teléfono y el computador deben estar en la misma red WiFi.
 - Probado en iPhone con Safari. En Android usar Chrome.
