@@ -80,43 +80,66 @@
     const paso2El = document.getElementById("paso2");
     const paso3El = document.getElementById("paso3");
 
-    // ESTADO DE CALIBRACIÓN
-    // pasoActual: 0 = sin calibrar, 1 = falta máx izq, 2 = falta máx der, 3 = calibrado
     let pasoActual = 0;
     let ultimoGamma = null;
     let equilibrio = null;
-    let maxIzquierda = null;   // gamma cuando se inclina al máximo hacia la izq
-    let maxDerecha = null;     // gamma cuando se inclina al máximo hacia la der
+    let maxIzquierda = null;
+    let maxDerecha = null;
     let desbalanceAnterior = null;
 
-    const SUAVIZADO = 0.3;
-    const UMBRAL = 1;
+    // ===================================================================
+    // PARÁMETROS DE SENSIBILIDAD — ajusta acá si quieres más o menos
+    // ===================================================================
+
+    // Zona muerta: si el desbalance crudo es menor a este % en valor
+    // absoluto, lo tratamos como equilibrio (0%). Esto resuelve el
+    // problema de "nunca alcanza el cero" por temblor o pequeños
+    // desequilibrios físicos.
+    // Sube este valor si todavía no llega al equilibrio. 15-20 está bien.
+    const ZONA_MUERTA = 15;
+
+    // Suavizado exponencial: 0 = sin suavizado (rápido pero nervioso),
+    // 1 = suavizado infinito (no se mueve). 0.7 es una respuesta más
+    // calmada que el 0.3 anterior.
+    const SUAVIZADO = 0.7;
+
+    // Cambio mínimo (en %) que dispara un envío al PC
+    const UMBRAL = 2;
+
+    // ===================================================================
+
     let desbalanceSuavizado = 0;
 
     function handler(event) {
       if (event.gamma === null) return;
       ultimoGamma = event.gamma;
 
-      // Sin calibrar todavía: mostrar grados crudos
       if (pasoActual < 3) {
         valorEl.textContent = Math.round(ultimoGamma) + "°";
         return;
       }
 
-      // Calibrado: calcular desbalance normalizado entre -100 y +100
       const dif = ultimoGamma - equilibrio;
       let pct;
 
       if (dif < 0) {
-        // Inclinada hacia el lado de "máxima izquierda"
         const rangoIzq = maxIzquierda - equilibrio;
         if (rangoIzq === 0) pct = 0;
         else pct = (dif / rangoIzq) * -100;
       } else {
-        // Inclinada hacia el lado de "máxima derecha"
         const rangoDer = maxDerecha - equilibrio;
         if (rangoDer === 0) pct = 0;
         else pct = (dif / rangoDer) * 100;
+      }
+
+      // Aplicar zona muerta: si está cerca del cero, redondear a cero
+      if (Math.abs(pct) < ZONA_MUERTA) {
+        pct = 0;
+      } else {
+        // Reescalar para que el rango efectivo siga siendo -100 a +100
+        // (sin la zona muerta no llegarías nunca al 100%)
+        const signo = pct < 0 ? -1 : 1;
+        pct = signo * ((Math.abs(pct) - ZONA_MUERTA) / (100 - ZONA_MUERTA)) * 100;
       }
 
       pct = Math.max(-100, Math.min(100, pct));
@@ -164,7 +187,6 @@
       }
 
       if (pasoActual === 0) {
-        // Paso 1: capturar equilibrio
         equilibrio = ultimoGamma;
         pasoActual = 1;
         paso1El.classList.add("done");
@@ -172,7 +194,6 @@
         instr.textContent = "Paso 2 de 3: Pon todo el peso en el platillo IZQUIERDO (inclinación máxima a la izq) y toca.";
       }
       else if (pasoActual === 1) {
-        // Paso 2: capturar máximo izquierda
         maxIzquierda = ultimoGamma;
         pasoActual = 2;
         paso2El.classList.add("done");
@@ -180,7 +201,6 @@
         instr.textContent = "Paso 3 de 3: Pon todo el peso en el platillo DERECHO (inclinación máxima a la der) y toca.";
       }
       else if (pasoActual === 2) {
-        // Paso 3: capturar máximo derecha
         maxDerecha = ultimoGamma;
         pasoActual = 3;
         paso3El.classList.add("done");
@@ -191,7 +211,6 @@
         instr.textContent = "✓ Calibrado. Pon objetos en los platillos y mira la pantalla.";
         Protobject.Core.send(0).to("index.html");
 
-        // Si por error capturó iguales o invertidos, advertir
         if (maxIzquierda === equilibrio || maxDerecha === equilibrio) {
           instr.textContent = "⚠️ Calibración inválida. Reinicia y procura inclinar bien en cada paso.";
         }
