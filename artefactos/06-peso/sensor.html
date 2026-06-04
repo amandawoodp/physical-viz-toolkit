@@ -11,17 +11,17 @@
       background: #fafafa; text-align: center;
     }
     #instr {
-      font-size: 20px; margin-top: 20px; color: #333;
+      font-size: 18px; margin-top: 15px; color: #333;
       min-height: 3em;
     }
     #valor {
-      font-size: 50px; margin: 25px 0; color: #2a7; font-weight: bold;
+      font-size: 50px; margin: 20px 0; color: #2a7; font-weight: bold;
     }
     button {
       display: block; width: 100%;
       font-weight: bold;
       border: none; border-radius: 14px;
-      margin: 12px 0;
+      margin: 10px 0;
       touch-action: manipulation;
       cursor: pointer;
     }
@@ -29,24 +29,42 @@
       padding: 18px; font-size: 18px;
       background: #e63946; color: white;
     }
-    .cal {
-      padding: 22px; font-size: 20px;
+    #calibrar {
+      padding: 20px; font-size: 18px;
       background: #2a7; color: white;
     }
-    .cal:active { background: #1a5; }
-    .cal.done { background: #94d2bd; }
+    #calibrar:active { background: #1a5; }
+    #calibrar.done { background: #94d2bd; }
+    #reset {
+      padding: 14px; font-size: 15px;
+      background: #6b7280; color: white;
+    }
+    #pasos {
+      display: flex; justify-content: center; gap: 8px;
+      margin: 10px 0;
+    }
+    .paso {
+      width: 40px; height: 8px; border-radius: 4px;
+      background: #d1d5db;
+    }
+    .paso.done { background: #2a7; }
   </style>
 </head>
 <body>
 
   <button id="permiso">PEDIR PERMISO DE ORIENTACIÓN</button>
 
-  <div id="instr">Pega la base del teléfono a la mesa con la esquina superior apoyada en el globo.</div>
+  <div id="pasos" style="display:none">
+    <div class="paso" id="paso1"></div>
+    <div class="paso" id="paso2"></div>
+  </div>
+
+  <div id="instr">Pega la base del teléfono a la mesa con masking tape y apoya la esquina superior sobre el globo.</div>
 
   <div id="valor">—</div>
 
-  <button id="calMin" class="cal" style="display:none">😌 SIN APRETAR (0%)</button>
-  <button id="calMax" class="cal" style="display:none">💪 APRETANDO AL MÁXIMO (100%)</button>
+  <button id="calibrar" style="display:none">PASO 1: SIN APRETAR EL GLOBO</button>
+  <button id="reset" style="display:none">↺ Reiniciar calibración</button>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
@@ -54,56 +72,79 @@
     const instr = document.getElementById("instr");
     const valorEl = document.getElementById("valor");
     const btnPermiso = document.getElementById("permiso");
-    const btnMin = document.getElementById("calMin");
-    const btnMax = document.getElementById("calMax");
+    const btnCalibrar = document.getElementById("calibrar");
+    const btnReset = document.getElementById("reset");
+    const pasosEl = document.getElementById("pasos");
+    const paso1El = document.getElementById("paso1");
+    const paso2El = document.getElementById("paso2");
 
-    // Estado
+    // ESTADO DE CALIBRACIÓN
+    // pasoActual: 0 = sin calibrar, 1 = falta máx, 2 = calibrado
+    let pasoActual = 0;
     let ultimoBeta = null;
-    let valorMin = null;       // beta cuando no aprietan (globo lleno)
-    let valorMax = null;       // beta cuando aprietan al máximo (globo deformado)
+    let betaReposo = null;     // inclinación con el globo sin apretar
+    let betaMaximo = null;     // inclinación apretando al máximo
     let intensidadAnterior = null;
 
-    // Filtros: evitamos enviar cada pequeña vibración del globo
-    const UMBRAL = 2;            // cambios menores a 2% no se mandan al PC
-    const SUAVIZADO = 0.3;       // 0 = sin suavizar, cerca de 1 = mucho lag
+    // ===================================================================
+    // PARÁMETROS DE FILTRADO
+    // ===================================================================
+
+    // Zona muerta: si la intensidad cruda es menor a este %, se considera 0
+    // Evita micro-vibraciones del globo cuando no lo estás apretando
+    const ZONA_MUERTA = 8;
+
+    // Suavizado exponencial: 0 = sin suavizado, 1 = no se mueve
+    // 0.5 es un buen balance entre respuesta y estabilidad
+    const SUAVIZADO = 0.5;
+
+    // Cambio mínimo (en %) que dispara un envío al PC
+    const UMBRAL = 2;
 
     let intensidadSuavizada = 0;
 
-    // ---- LISTENER DEL SENSOR ----
-    // El teléfono está vertical con la base pegada a la mesa y la
-    // esquina superior apoyada en el globo. Al apretar el globo, la
-    // esquina superior baja y el teléfono se endereza. Esto cambia
-    // principalmente 'beta' (inclinación adelante-atrás).
     function handler(event) {
       if (event.beta === null) return;
       ultimoBeta = event.beta;
 
-      if (valorMin === null || valorMax === null) {
-        // Aún no calibrado: mostrar valor crudo localmente
+      if (pasoActual < 2) {
         valorEl.textContent = Math.round(ultimoBeta) + "°";
         return;
       }
 
-      // Normalizar: 0% en valorMin (sin apretar), 100% en valorMax (apretado).
-      // Como la fórmula usa la DIFERENCIA, da igual si beta sube o baja al
-      // apretar: la calibración define automáticamente el sentido.
-      let t = (ultimoBeta - valorMin) / (valorMax - valorMin);
-      t = Math.max(0, Math.min(1, t));
+      // Calcular intensidad normalizada entre 0% y 100%
+      const dif = ultimoBeta - betaReposo;
+      const rango = betaMaximo - betaReposo;
 
-      // Suavizado exponencial para filtrar micro-vibraciones del globo
-      intensidadSuavizada = intensidadSuavizada * SUAVIZADO + t * (1 - SUAVIZADO);
+      let pct;
+      if (rango === 0) {
+        pct = 0;
+      } else {
+        pct = (dif / rango) * 100;
+      }
 
-      const intensidad = Math.round(intensidadSuavizada * 100);
+      // Aplicar zona muerta
+      if (Math.abs(pct) < ZONA_MUERTA) {
+        pct = 0;
+      } else {
+        // Reescalar para que el rango efectivo siga siendo 0 a 100
+        const signo = pct < 0 ? -1 : 1;
+        pct = signo * ((Math.abs(pct) - ZONA_MUERTA) / (100 - ZONA_MUERTA)) * 100;
+      }
+
+      pct = Math.max(0, Math.min(100, pct));
+
+      intensidadSuavizada = intensidadSuavizada * SUAVIZADO + pct * (1 - SUAVIZADO);
+
+      const intensidad = Math.round(intensidadSuavizada);
       valorEl.textContent = intensidad + "%";
 
-      // Solo enviar al PC cuando hay cambio significativo
       if (intensidadAnterior === null || Math.abs(intensidad - intensidadAnterior) >= UMBRAL) {
         intensidadAnterior = intensidad;
         Protobject.Core.send(intensidad).to("index.html");
       }
     }
 
-    // ---- PERMISO iOS ----
     btnPermiso.addEventListener("click", async () => {
       try {
         if (typeof DeviceOrientationEvent !== "undefined" &&
@@ -121,40 +162,66 @@
 
     function iniciar() {
       btnPermiso.style.display = "none";
-      btnMin.style.display = "block";
-      btnMax.style.display = "block";
-      instr.textContent = "Sin apretar el globo, toca 'SIN APRETAR'.";
+      btnCalibrar.style.display = "block";
+      pasosEl.style.display = "flex";
+      instr.textContent = "Paso 1 de 2: Sin apretar el globo (el teléfono apoyado en su posición de reposo), toca el botón.";
       window.addEventListener("deviceorientationabsolute", handler, true);
       window.addEventListener("deviceorientation", handler, true);
     }
 
-    // ---- CALIBRACIÓN DE LOS DOS EXTREMOS ----
-    function calibrar(esMin, e) {
+    function calibrar(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       if (ultimoBeta === null) {
-        instr.textContent = "Esperando lectura... mueve un poco el teléfono.";
+        instr.textContent = "Esperando lectura del sensor...";
         return;
       }
 
-      if (esMin) {
-        valorMin = ultimoBeta;
-        btnMin.textContent = "✓ SIN APRETAR calibrado en " + Math.round(valorMin) + "°";
-        btnMin.classList.add("done");
-        instr.textContent = "Ahora aprieta el globo al máximo y toca 'APRETANDO AL MÁXIMO'.";
-      } else {
-        valorMax = ultimoBeta;
-        btnMax.textContent = "✓ APRETADO calibrado en " + Math.round(valorMax) + "°";
-        btnMax.classList.add("done");
-        instr.textContent = "✓ Listo. Aprieta el globo con distinta fuerza.";
+      if (pasoActual === 0) {
+        // Paso 1: capturar reposo (sin apretar)
+        betaReposo = ultimoBeta;
+        pasoActual = 1;
+        paso1El.classList.add("done");
+        btnCalibrar.textContent = "PASO 2: APRETANDO AL MÁXIMO";
+        instr.textContent = "Paso 2 de 2: Aprieta el globo al MÁXIMO (todo lo que vas a apretarlo en uso real) y, mientras lo aprietas, toca el botón.";
+      }
+      else if (pasoActual === 1) {
+        // Paso 2: capturar máximo
+        betaMaximo = ultimoBeta;
+        pasoActual = 2;
+        paso2El.classList.add("done");
+        intensidadAnterior = 0;
+        intensidadSuavizada = 0;
+        btnCalibrar.style.display = "none";
+        btnReset.style.display = "block";
+        instr.textContent = "✓ Calibrado. Suelta el globo y empieza a apretarlo. La pantalla mostrará la intensidad.";
+        Protobject.Core.send(0).to("index.html");
+
+        if (betaReposo === betaMaximo) {
+          instr.textContent = "⚠️ Calibración inválida: las dos lecturas son iguales. Reinicia y procura apretar bien el globo en el paso 2.";
+        }
       }
     }
 
-    btnMin.addEventListener("touchstart", (e) => calibrar(true, e));
-    btnMin.addEventListener("click", (e) => calibrar(true, e));
-    btnMax.addEventListener("touchstart", (e) => calibrar(false, e));
-    btnMax.addEventListener("click", (e) => calibrar(false, e));
+    function reiniciar(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      pasoActual = 0;
+      betaReposo = null;
+      betaMaximo = null;
+      intensidadAnterior = null;
+      intensidadSuavizada = 0;
+      paso1El.classList.remove("done");
+      paso2El.classList.remove("done");
+      btnCalibrar.style.display = "block";
+      btnReset.style.display = "none";
+      btnCalibrar.textContent = "PASO 1: SIN APRETAR EL GLOBO";
+      instr.textContent = "Paso 1 de 2: Sin apretar el globo, toca el botón.";
+    }
 
-    // Android arranca solo (no requiere permiso explícito)
+    btnCalibrar.addEventListener("touchstart", calibrar);
+    btnCalibrar.addEventListener("click", calibrar);
+    btnReset.addEventListener("touchstart", reiniciar);
+    btnReset.addEventListener("click", reiniciar);
+
     if (typeof DeviceOrientationEvent === "undefined" ||
         typeof DeviceOrientationEvent.requestPermission !== "function") {
       iniciar();

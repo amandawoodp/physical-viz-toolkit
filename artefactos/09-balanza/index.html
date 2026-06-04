@@ -2,65 +2,113 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Balanza de datos</title>
+  <title>Superficie táctil (HandSensor)</title>
   <style>
     body {
-      margin: 0; height: 100vh;
+      margin: 0; min-height: 100vh;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       font-family: sans-serif; background: #f4f4f4;
-      gap: 30px;
-      overflow: hidden;
+      gap: 20px;
+      padding: 20px 0;
     }
     #titulo {
-      font-size: 2.5rem;
+      font-size: 2.2rem;
       font-weight: bold;
       color: #2a7;
       letter-spacing: 2px;
       text-transform: uppercase;
     }
     #subtitulo {
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       color: #666;
-      margin-top: -20px;
+      margin-top: -15px;
     }
-    #balanza {
-      width: 700px;
-      height: 320px;
-      position: relative;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
+    #estado-conexiones {
+      display: flex; gap: 30px;
+      font-size: 1rem;
     }
-    #brazo {
-      width: 600px;
-      height: 18px;
-      background: #2a7;
-      border-radius: 8px;
-      position: absolute;
-      bottom: 140px;
-      left: 50px;
-      transform-origin: center center;
-      transform: rotate(0deg);
-      transition: transform 0.15s ease-out;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    .conexion { padding: 8px 14px; border-radius: 20px; background: #e5e7eb; color: #6b7280; }
+    .conexion.ok { background: #d1fae5; color: #065f46; }
+
+    #zonas {
+      display: flex; gap: 30px; margin-top: 10px;
     }
-    #fulcro {
-      width: 0;
-      height: 0;
-      border-left: 40px solid transparent;
-      border-right: 40px solid transparent;
-      border-bottom: 80px solid #2a7;
-      position: absolute;
-      bottom: 60px;
+    .zona {
+      width: 220px; height: 220px;
+      background: #fff;
+      border: 5px solid #d1d5db;
+      border-radius: 24px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-size: 2rem; font-weight: bold;
+      color: #374151;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .zona.hover {
+      border-color: #facc15;
+      background: #fef9c3;
+    }
+    .zona.activa {
+      border-color: #16a34a;
+      background: #d1fae5;
+      transform: scale(1.05);
+      color: #065f46;
+    }
+    .zona .check {
+      font-size: 1.5rem;
+      color: #16a34a;
+      margin-top: 5px;
+      visibility: hidden;
+    }
+    .zona.calibrada .check { visibility: visible; }
+
+    #estado-fusion {
+      font-size: 1.2rem; color: #6b7280;
+      min-height: 1.5em;
     }
 
-    #estado {
-      font-size: 2.2rem;
-      font-weight: bold;
-      color: #222;
-      height: 1.5em;
-      text-align: center;
+    #panel-calibracion {
+      background: #fff;
+      border: 2px solid #3b82f6;
+      border-radius: 16px;
+      padding: 20px 30px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      max-width: 700px;
+    }
+    #panel-calibracion h3 {
+      margin: 0 0 10px 0;
+      color: #1e3a8a;
+      font-size: 1.2rem;
+    }
+    #panel-calibracion p {
+      margin: 0 0 15px 0;
+      color: #475569;
+      font-size: 1rem;
+    }
+    .botones-cal {
+      display: flex; gap: 12px; flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn-cal {
+      padding: 12px 20px; font-size: 1rem;
+      font-weight: bold; cursor: pointer;
+      border: none; border-radius: 10px;
+      background: #3b82f6; color: white;
+      transition: all 0.15s;
+    }
+    .btn-cal:hover { background: #2563eb; }
+    .btn-cal:disabled {
+      background: #cbd5e1; color: #64748b; cursor: not-allowed;
+    }
+    .btn-cal.done {
+      background: #10b981;
+    }
+    .btn-reset {
+      background: #6b7280;
+      padding: 10px 16px;
+      font-size: 0.9rem;
     }
 
     #ProtobjectPlusButton {
@@ -76,62 +124,273 @@
       border-radius: 30px !important;
     }
     #ProtobjectPlusButton:after {
-      content: " Conectar teléfono";
+      content: " Conectar teléfonos";
     }
   </style>
 </head>
 <body>
 
-  <div id="titulo">Ejemplo 9 · Balanza de datos</div>
-  <div id="subtitulo">Equilibra los dos platillos</div>
+  <div id="titulo">Ejemplo 7 · Superficie táctil</div>
+  <div id="subtitulo">Toca con el dedo una de las tres zonas</div>
 
-  <div id="balanza">
-    <div id="fulcro"></div>
-    <div id="brazo"></div>
+  <div id="estado-conexiones">
+    <div class="conexion" id="conCenital">📱 Cenital: desconectado</div>
+    <div class="conexion" id="conFrontal">📱 Frontal: desconectado</div>
   </div>
 
-  <div id="estado">⚖️ En equilibrio</div>
+  <div id="panel-calibracion">
+    <h3>📍 Calibración (5 pasos)</h3>
+    <p id="instr-cal">Conecta ambos teléfonos. Luego pon el dedo sobre la zona A del tablero y haz click en "Calibrar A".</p>
+    <div class="botones-cal">
+      <button class="btn-cal" id="btnCalA" disabled>1. Calibrar zona A</button>
+      <button class="btn-cal" id="btnCalB" disabled>2. Calibrar zona B</button>
+      <button class="btn-cal" id="btnCalC" disabled>3. Calibrar zona C</button>
+      <button class="btn-cal" id="btnCalArriba" disabled>4. Dedo arriba (sin tocar)</button>
+      <button class="btn-cal" id="btnCalAbajo" disabled>5. Dedo en la mesa</button>
+      <button class="btn-cal btn-reset" id="btnReset">↺ Reiniciar</button>
+    </div>
+  </div>
+
+  <div id="zonas">
+    <div class="zona" id="zonaA">A<div class="check">✓</div></div>
+    <div class="zona" id="zonaB">B<div class="check">✓</div></div>
+    <div class="zona" id="zonaC">C<div class="check">✓</div></div>
+  </div>
+
+  <div id="estado-fusion">Esperando calibración...</div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
-    const brazo = document.getElementById("brazo");
-    const estadoEl = document.getElementById("estado");
-    const subtitulo = document.getElementById("subtitulo");
-
-    let primerMensaje = false;
-
     // ===================================================================
-    // SENSIBILIDAD VISUAL
-    // Cuántos grados de rotación visual aplicar por cada 1% de desbalance.
-    // Más alto = la balanza se inclina más visualmente.
-    // 0.25 era el original (sutil). 0.6 = el doble de drástico.
+    // CRÍTICO: Registrar onReceived ANTES de cualquier otra lógica.
+    // Si esto se hace al final del script, las conexiones de los
+    // teléfonos llegan ANTES y Protobject se queja:
+    // "New connection, but no callback registered"
     // ===================================================================
-    const ROTACION_POR_PORCENTAJE = 0.6;
 
-    Protobject.Core.onReceived((desbalance) => {
-      const d = Math.max(-100, Math.min(100, desbalance));
+    // Variables que se usan dentro del callback (deben existir ya)
+    let ultimaPosCenital = null;
+    let ultimaAlturaFrontal = null;
+    let cenitalConectado = false;
+    let frontalConectado = false;
+    let actualizarFn = null;   // se asigna abajo
+    let actualizarBotonesFn = null;
 
-      const angulo = d * ROTACION_POR_PORCENTAJE;
-      brazo.style.transform = "rotate(" + angulo + "deg)";
+    Protobject.Core.onReceived((msg) => {
+      console.log("PC RECIBIÓ:", msg);
 
-      if (Math.abs(d) < 5) {
-        estadoEl.textContent = "⚖️ En equilibrio";
-        estadoEl.style.color = "#2a7";
-      } else if (d < 0) {
-        estadoEl.textContent = "← Inclinada a la izquierda (" + Math.abs(d) + "%)";
-        estadoEl.style.color = "#dc2626";
-      } else {
-        estadoEl.textContent = "Inclinada a la derecha (" + d + "%) →";
-        estadoEl.style.color = "#1d4ed8";
+      if (!msg || !msg.tipo) return;
+
+      if (msg.tipo === "cenital") {
+        ultimaPosCenital = { x: msg.x, y: msg.y, t: Date.now() };
+        if (!cenitalConectado) {
+          cenitalConectado = true;
+          const el = document.getElementById("conCenital");
+          if (el) {
+            el.textContent = "📱 Cenital: ✓ conectado";
+            el.classList.add("ok");
+          }
+          if (actualizarBotonesFn) actualizarBotonesFn();
+        }
+      }
+      else if (msg.tipo === "frontal") {
+        ultimaAlturaFrontal = { z: msg.z, t: Date.now() };
+        if (!frontalConectado) {
+          frontalConectado = true;
+          const el = document.getElementById("conFrontal");
+          if (el) {
+            el.textContent = "📱 Frontal: ✓ conectado";
+            el.classList.add("ok");
+          }
+          if (actualizarBotonesFn) actualizarBotonesFn();
+        }
       }
 
-      if (!primerMensaje) {
-        primerMensaje = true;
-        subtitulo.textContent = "✓ Teléfono conectado · pesa los datos";
-        subtitulo.style.color = "#2a7";
-      }
+      if (actualizarFn) actualizarFn();
     });
+
+    console.log("PC: callback onReceived registrado, listo para recibir conexiones");
+
+    // ===================================================================
+    // RESTO DE LA LÓGICA (calibración, detección de zonas, etc.)
+    // ===================================================================
+
+    const RADIO_ZONA = 0.18;
+    const VENTANA_MS = 250;
+
+    let calibracion = {
+      A: null,
+      B: null,
+      C: null,
+      zArriba: null,
+      zAbajo: null
+    };
+
+    const zonaEls = {
+      A: document.getElementById("zonaA"),
+      B: document.getElementById("zonaB"),
+      C: document.getElementById("zonaC")
+    };
+    const btnCal = {
+      A: document.getElementById("btnCalA"),
+      B: document.getElementById("btnCalB"),
+      C: document.getElementById("btnCalC"),
+      Arriba: document.getElementById("btnCalArriba"),
+      Abajo: document.getElementById("btnCalAbajo")
+    };
+    const estadoFusion = document.getElementById("estado-fusion");
+    const instrCal = document.getElementById("instr-cal");
+
+    function actualizarBotones() {
+      btnCal.A.disabled = !cenitalConectado;
+      btnCal.B.disabled = !cenitalConectado || !calibracion.A;
+      btnCal.C.disabled = !cenitalConectado || !calibracion.B;
+      btnCal.Arriba.disabled = !frontalConectado || !calibracion.C;
+      btnCal.Abajo.disabled = !frontalConectado || calibracion.zArriba === null;
+    }
+    actualizarBotonesFn = actualizarBotones;
+
+    function calibrarZona(letra) {
+      if (!ultimaPosCenital) {
+        instrCal.textContent = "❌ No hay datos del cenital. Mueve el dedo bajo la cámara.";
+        return;
+      }
+      calibracion[letra] = { x: ultimaPosCenital.x, y: ultimaPosCenital.y };
+      btnCal[letra].textContent = "✓ Zona " + letra + " calibrada";
+      btnCal[letra].classList.add("done");
+      zonaEls[letra].classList.add("calibrada");
+
+      if (letra === "A") instrCal.textContent = "✓ Zona A capturada. Ahora pon el dedo sobre la zona B y click 'Calibrar B'.";
+      else if (letra === "B") instrCal.textContent = "✓ Zona B capturada. Ahora pon el dedo sobre la zona C y click 'Calibrar C'.";
+      else if (letra === "C") instrCal.textContent = "✓ Zona C capturada. Ahora pon el dedo ARRIBA (sin tocar la mesa) y click 'Dedo arriba'.";
+
+      actualizarBotones();
+    }
+
+    function calibrarAltura(cual) {
+      if (!ultimaAlturaFrontal) {
+        instrCal.textContent = "❌ No hay datos del frontal. Mueve el dedo frente a la cámara frontal.";
+        return;
+      }
+      if (cual === "arriba") {
+        calibracion.zArriba = ultimaAlturaFrontal.z;
+        btnCal.Arriba.textContent = "✓ Dedo arriba: " + ultimaAlturaFrontal.z.toFixed(2);
+        btnCal.Arriba.classList.add("done");
+        instrCal.textContent = "✓ Altura 'arriba' capturada. Ahora pon el dedo TOCANDO la mesa y click 'Dedo en la mesa'.";
+      } else {
+        calibracion.zAbajo = ultimaAlturaFrontal.z;
+        btnCal.Abajo.textContent = "✓ Dedo abajo: " + ultimaAlturaFrontal.z.toFixed(2);
+        btnCal.Abajo.classList.add("done");
+        instrCal.textContent = "✅ Calibración completa. Ya puedes tocar las zonas del tablero.";
+      }
+      actualizarBotones();
+    }
+
+    function reiniciarCalibracion() {
+      calibracion = { A: null, B: null, C: null, zArriba: null, zAbajo: null };
+      for (const k of ["A", "B", "C"]) {
+        btnCal[k].classList.remove("done");
+        zonaEls[k].classList.remove("calibrada");
+      }
+      btnCal.A.textContent = "1. Calibrar zona A";
+      btnCal.B.textContent = "2. Calibrar zona B";
+      btnCal.C.textContent = "3. Calibrar zona C";
+      btnCal.Arriba.textContent = "4. Dedo arriba (sin tocar)";
+      btnCal.Abajo.textContent = "5. Dedo en la mesa";
+      btnCal.Arriba.classList.remove("done");
+      btnCal.Abajo.classList.remove("done");
+      instrCal.textContent = "Pon el dedo sobre la zona A del tablero y haz click en 'Calibrar A'.";
+      actualizarBotones();
+    }
+
+    btnCal.A.addEventListener("click", () => calibrarZona("A"));
+    btnCal.B.addEventListener("click", () => calibrarZona("B"));
+    btnCal.C.addEventListener("click", () => calibrarZona("C"));
+    btnCal.Arriba.addEventListener("click", () => calibrarAltura("arriba"));
+    btnCal.Abajo.addEventListener("click", () => calibrarAltura("abajo"));
+    document.getElementById("btnReset").addEventListener("click", reiniciarCalibracion);
+
+    function detectarZona(x, y) {
+      let zonaMasCerca = null;
+      let distanciaMin = RADIO_ZONA;
+
+      for (const nombre of ["A", "B", "C"]) {
+        const c = calibracion[nombre];
+        if (!c) continue;
+        const dx = x - c.x;
+        const dy = y - c.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < distanciaMin) {
+          distanciaMin = dist;
+          zonaMasCerca = nombre;
+        }
+      }
+      return zonaMasCerca;
+    }
+
+    function estaTocando(z) {
+      if (calibracion.zArriba === null || calibracion.zAbajo === null) return false;
+      const umbral = (calibracion.zArriba + calibracion.zAbajo) / 2;
+      if (calibracion.zAbajo > calibracion.zArriba) {
+        return z >= umbral;
+      } else {
+        return z <= umbral;
+      }
+    }
+
+    function actualizar() {
+      const ahora = Date.now();
+      const todoCalibrado = calibracion.A && calibracion.B && calibracion.C &&
+                            calibracion.zArriba !== null && calibracion.zAbajo !== null;
+
+      if (!todoCalibrado) {
+        estadoFusion.textContent = "Completa la calibración para empezar a tocar";
+        return;
+      }
+
+      if (!ultimaPosCenital || !ultimaAlturaFrontal) {
+        return;
+      }
+      if (ahora - ultimaPosCenital.t > VENTANA_MS ||
+          ahora - ultimaAlturaFrontal.t > VENTANA_MS) {
+        limpiarZonas();
+        estadoFusion.textContent = "Buscando dedo en ambas cámaras...";
+        return;
+      }
+
+      const zonaCenital = detectarZona(ultimaPosCenital.x, ultimaPosCenital.y);
+      const tocando = estaTocando(ultimaAlturaFrontal.z);
+
+      limpiarZonas();
+
+      if (zonaCenital) {
+        zonaEls[zonaCenital].classList.add("hover");
+      }
+
+      if (zonaCenital && tocando) {
+        zonaEls[zonaCenital].classList.remove("hover");
+        zonaEls[zonaCenital].classList.add("activa");
+        estadoFusion.textContent = "✓ TOQUE confirmado en zona " + zonaCenital;
+        estadoFusion.style.color = "#16a34a";
+      } else if (zonaCenital) {
+        estadoFusion.textContent = "👆 Hover en " + zonaCenital + " — acerca el dedo a la mesa";
+        estadoFusion.style.color = "#92400e";
+      } else {
+        estadoFusion.textContent = "Mueve el dedo a una zona";
+        estadoFusion.style.color = "#6b7280";
+      }
+    }
+    actualizarFn = actualizar;
+
+    function limpiarZonas() {
+      for (const k in zonaEls) {
+        zonaEls[k].classList.remove("hover", "activa");
+      }
+    }
+
+    setInterval(actualizar, 100);
+    actualizarBotones();
   </script>
 
   <script src="config.js"></script>
