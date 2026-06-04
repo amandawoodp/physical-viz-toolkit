@@ -140,9 +140,9 @@
 
   <div id="panel-calibracion">
     <h3>📍 Calibración (5 pasos)</h3>
-    <p id="instr-cal">Conecta ambos teléfonos. Luego pon el dedo sobre la zona A del tablero y haz click en "Calibrar A".</p>
+    <p id="instr-cal">Pon el dedo sobre la zona A del tablero y haz click en "Calibrar A".</p>
     <div class="botones-cal">
-      <button class="btn-cal" id="btnCalA" disabled>1. Calibrar zona A</button>
+      <button class="btn-cal" id="btnCalA">1. Calibrar zona A</button>
       <button class="btn-cal" id="btnCalB" disabled>2. Calibrar zona B</button>
       <button class="btn-cal" id="btnCalC" disabled>3. Calibrar zona C</button>
       <button class="btn-cal" id="btnCalArriba" disabled>4. Dedo arriba (sin tocar)</button>
@@ -157,18 +157,14 @@
     <div class="zona" id="zonaC">C<div class="check">✓</div></div>
   </div>
 
-  <div id="estado-fusion">Esperando calibración...</div>
+  <div id="estado-fusion">Esperando datos de los teléfonos...</div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
     // ===================================================================
-    // FIX CRÍTICO: Registrar onReceived ANTES de cualquier otra lógica.
-    // Si el callback se registra al final del script, los teléfonos se
-    // conectan antes y Protobject se queja:
-    // "New connection, but no callback registered"
+    // CALLBACK AL INICIO (importante para no perder mensajes)
     // ===================================================================
-
     let ultimaPosCenital = null;
     let ultimaAlturaFrontal = null;
     let cenitalConectado = false;
@@ -190,7 +186,6 @@
             el.textContent = "📱 Cenital: ✓ conectado";
             el.classList.add("ok");
           }
-          if (actualizarBotonesFn) actualizarBotonesFn();
         }
       }
       else if (msg.tipo === "frontal") {
@@ -202,7 +197,6 @@
             el.textContent = "📱 Frontal: ✓ conectado";
             el.classList.add("ok");
           }
-          if (actualizarBotonesFn) actualizarBotonesFn();
         }
       }
 
@@ -240,18 +234,23 @@
     const estadoFusion = document.getElementById("estado-fusion");
     const instrCal = document.getElementById("instr-cal");
 
+    // ===================================================================
+    // BOTONES: ahora se habilitan solo por progreso de calibración,
+    // NO por estado de conexión. Si haces click sin datos, la función
+    // calibrarZona avisará con un mensaje claro.
+    // ===================================================================
     function actualizarBotones() {
-      btnCal.A.disabled = !cenitalConectado;
-      btnCal.B.disabled = !cenitalConectado || !calibracion.A;
-      btnCal.C.disabled = !cenitalConectado || !calibracion.B;
-      btnCal.Arriba.disabled = !frontalConectado || !calibracion.C;
-      btnCal.Abajo.disabled = !frontalConectado || calibracion.zArriba === null;
+      btnCal.A.disabled = false;                            // siempre activo
+      btnCal.B.disabled = !calibracion.A;                   // necesita A hecho
+      btnCal.C.disabled = !calibracion.B;                   // necesita B hecho
+      btnCal.Arriba.disabled = !calibracion.C;              // necesita C hecho
+      btnCal.Abajo.disabled = calibracion.zArriba === null; // necesita arriba hecho
     }
     actualizarBotonesFn = actualizarBotones;
 
     function calibrarZona(letra) {
       if (!ultimaPosCenital) {
-        instrCal.textContent = "❌ No hay datos del cenital. Mueve el dedo bajo la cámara.";
+        instrCal.textContent = "❌ No llegan datos del cenital al PC. Verifica que el teléfono cenital esté detectando tu mano (debería ver 'x: 0.XX' en su pantalla).";
         return;
       }
       calibracion[letra] = { x: ultimaPosCenital.x, y: ultimaPosCenital.y };
@@ -259,28 +258,28 @@
       btnCal[letra].classList.add("done");
       zonaEls[letra].classList.add("calibrada");
 
-      if (letra === "A") instrCal.textContent = "✓ Zona A capturada. Ahora pon el dedo sobre la zona B y click 'Calibrar B'.";
-      else if (letra === "B") instrCal.textContent = "✓ Zona B capturada. Ahora pon el dedo sobre la zona C y click 'Calibrar C'.";
-      else if (letra === "C") instrCal.textContent = "✓ Zona C capturada. Ahora pon el dedo ARRIBA (sin tocar la mesa) y click 'Dedo arriba'.";
+      if (letra === "A") instrCal.textContent = "✓ Zona A capturada en x=" + ultimaPosCenital.x.toFixed(2) + " y=" + ultimaPosCenital.y.toFixed(2) + ". Ahora pon el dedo sobre la zona B.";
+      else if (letra === "B") instrCal.textContent = "✓ Zona B capturada. Ahora pon el dedo sobre la zona C.";
+      else if (letra === "C") instrCal.textContent = "✓ Zona C capturada. Ahora pon el dedo ARRIBA (sin tocar la mesa).";
 
       actualizarBotones();
     }
 
     function calibrarAltura(cual) {
       if (!ultimaAlturaFrontal) {
-        instrCal.textContent = "❌ No hay datos del frontal. Mueve el dedo frente a la cámara frontal.";
+        instrCal.textContent = "❌ No llegan datos del frontal al PC. Verifica que el teléfono frontal esté detectando tu mano (debería ver 'altura z' en su pantalla).";
         return;
       }
       if (cual === "arriba") {
         calibracion.zArriba = ultimaAlturaFrontal.z;
         btnCal.Arriba.textContent = "✓ Dedo arriba: " + ultimaAlturaFrontal.z.toFixed(2);
         btnCal.Arriba.classList.add("done");
-        instrCal.textContent = "✓ Altura 'arriba' capturada. Ahora pon el dedo TOCANDO la mesa y click 'Dedo en la mesa'.";
+        instrCal.textContent = "✓ Altura 'arriba' = " + ultimaAlturaFrontal.z.toFixed(2) + ". Ahora pon el dedo TOCANDO la mesa.";
       } else {
         calibracion.zAbajo = ultimaAlturaFrontal.z;
         btnCal.Abajo.textContent = "✓ Dedo abajo: " + ultimaAlturaFrontal.z.toFixed(2);
         btnCal.Abajo.classList.add("done");
-        instrCal.textContent = "✅ Calibración completa. Ya puedes tocar las zonas del tablero.";
+        instrCal.textContent = "✅ Calibración completa. Toca las zonas del tablero.";
       }
       actualizarBotones();
     }
