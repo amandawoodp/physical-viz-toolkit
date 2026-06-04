@@ -3,43 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Sensor cenital (X, Y)</title>
+  <title>Sensor cenital V2</title>
   <style>
     body {
       font-family: sans-serif; padding: 15px; margin: 0;
       background: #fafafa; text-align: center;
     }
     h2 { font-size: 18px; margin: 5px; }
-    #instr { font-size: 14px; color: #333; margin: 10px 0; }
     #valor {
       font-size: 24px; margin: 10px 0; color: #2a7; font-weight: bold;
     }
     #lecturas { font-size: 12px; color: #888; }
-    #envios { font-size: 12px; color: #2a7; }
-    #debug {
-      background: #1f2937;
-      color: #10b981;
-      font-family: monospace;
-      font-size: 10px;
-      padding: 8px;
-      text-align: left;
-      border-radius: 6px;
-      margin-top: 15px;
-      max-height: 200px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
+    #envios { font-size: 14px; color: #2a7; font-weight: bold; }
   </style>
 </head>
 <body>
 
-  <h2>📷 Cámara CENITAL (X, Y)</h2>
-  <div id="instr">Posición plana del dedo. Pon este teléfono en la Base A2.</div>
+  <h2>📷 Cámara CENITAL V2</h2>
+  <div>Pon la mano frente a la cámara.</div>
   <div id="valor">—</div>
   <div id="lecturas">Lecturas: 0</div>
   <div id="envios">Envíos al PC: 0</div>
-  <div id="debug">[Esperando primer data...]</div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
@@ -47,14 +31,8 @@
     const valorEl = document.getElementById("valor");
     const lecturasEl = document.getElementById("lecturas");
     const enviosEl = document.getElementById("envios");
-    const debugEl = document.getElementById("debug");
     let contador = 0;
     let contadorEnvios = 0;
-    let dataMostrada = false;
-
-    function log(texto) {
-      debugEl.textContent = texto;
-    }
 
     async function elegirYIniciar() {
       try {
@@ -79,7 +57,7 @@
         Protobject.HandSensor.start(150, 0);
       }
 
-      Protobject.HandSensor.showPreview({ top: 280, left: 10, width: 320, height: 240 });
+      Protobject.HandSensor.showPreview({ top: 220, left: 10, width: 320, height: 240 });
     }
     elegirYIniciar();
 
@@ -87,54 +65,31 @@
       contador++;
       lecturasEl.textContent = "Lecturas: " + contador;
 
-      // === DEBUG: cada 20 lecturas, mostrar estructura de data en pantalla ===
-      if (contador % 20 === 0 || !dataMostrada) {
-        dataMostrada = true;
-        let resumen = "Lectura #" + contador + "\n";
-        resumen += "typeof data: " + typeof data + "\n";
-        resumen += "isArray: " + Array.isArray(data) + "\n";
-        if (data) {
-          resumen += "keys: " + Object.keys(data).join(", ") + "\n";
-          if (Array.isArray(data)) resumen += "length: " + data.length + "\n";
-          try {
-            resumen += "JSON: " + JSON.stringify(data).substring(0, 300);
-          } catch(e) {
-            resumen += "(no se puede serializar)";
-          }
-        } else {
-          resumen += "data es null/undefined";
-        }
-        log(resumen);
-      }
-
-      let mano = null;
-      if (Array.isArray(data) && data.length > 0) mano = data[0];
-      else if (data && data.hands && data.hands.length > 0) mano = data.hands[0];
-
-      if (!mano) {
+      if (!data || !data.landmarks || data.landmarks.length === 0) {
         valorEl.textContent = "Sin mano detectada";
         return;
       }
 
-      let p = null;
-      if (mano.landmarks && mano.landmarks[8]) p = mano.landmarks[8];
-      else if (mano[8]) p = mano[8];
-      else if (mano.keypoints && mano.keypoints[8]) p = mano.keypoints[8];
+      const mano = data.landmarks[0];
 
-      if (!p || p.x === undefined) {
-        valorEl.textContent = "Estructura desconocida";
-        log("MANO sin landmark 8 reconocido:\n" + JSON.stringify(mano).substring(0, 400));
+      if (!mano || mano.length < 9) {
+        valorEl.textContent = "Mano sin landmarks";
         return;
       }
 
-      let x = p.x, y = p.y;
-      if (x > 1) x = x / 640;
-      if (y > 1) y = y / 480;
+      const p = mano[8];
 
-      valorEl.textContent = "x: " + x.toFixed(2) + "  y: " + y.toFixed(2);
+      if (!p || p.x === undefined) {
+        valorEl.textContent = "Landmark 8 invalido";
+        return;
+      }
 
-      const mensaje = { tipo: "cenital", x: x, y: y };
-      Protobject.Core.send(mensaje).to("index.html");
+      const x = p.x;
+      const y = p.y;
+
+      valorEl.textContent = "x: " + x.toFixed(2) + " y: " + y.toFixed(2);
+
+      Protobject.Core.send({ tipo: "cenital", x: x, y: y }).to("index.html");
 
       contadorEnvios++;
       enviosEl.textContent = "Envíos al PC: " + contadorEnvios;

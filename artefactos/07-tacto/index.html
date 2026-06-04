@@ -30,7 +30,6 @@
     }
     .conexion { padding: 8px 14px; border-radius: 20px; background: #e5e7eb; color: #6b7280; }
     .conexion.ok { background: #d1fae5; color: #065f46; }
-
     #zonas {
       display: flex; gap: 30px; margin-top: 10px;
     }
@@ -63,12 +62,10 @@
       visibility: hidden;
     }
     .zona.calibrada .check { visibility: visible; }
-
     #estado-fusion {
       font-size: 1.2rem; color: #6b7280;
       min-height: 1.5em;
     }
-
     #panel-calibracion {
       background: #fff;
       border: 2px solid #3b82f6;
@@ -110,7 +107,6 @@
       padding: 10px 16px;
       font-size: 0.9rem;
     }
-
     #ProtobjectPlusButton {
       width: auto !important;
       height: auto !important;
@@ -162,18 +158,14 @@
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
-    // ===================================================================
-    // CALLBACK AL INICIO (importante para no perder mensajes)
-    // ===================================================================
     let ultimaPosCenital = null;
     let ultimaAlturaFrontal = null;
     let cenitalConectado = false;
     let frontalConectado = false;
     let actualizarFn = null;
-    let actualizarBotonesFn = null;
 
     Protobject.Core.onReceived((msg) => {
-      console.log("PC RECIBIÓ:", msg);
+      console.log("PC RECIBIO:", msg);
 
       if (!msg || !msg.tipo) return;
 
@@ -203,11 +195,8 @@
       if (actualizarFn) actualizarFn();
     });
 
-    console.log("PC: callback onReceived registrado, listo para recibir conexiones");
+    console.log("PC: callback registrado");
 
-    // ===================================================================
-    // CONFIGURACIÓN
-    // ===================================================================
     const RADIO_ZONA = 0.18;
     const VENTANA_MS = 250;
 
@@ -234,23 +223,17 @@
     const estadoFusion = document.getElementById("estado-fusion");
     const instrCal = document.getElementById("instr-cal");
 
-    // ===================================================================
-    // BOTONES: ahora se habilitan solo por progreso de calibración,
-    // NO por estado de conexión. Si haces click sin datos, la función
-    // calibrarZona avisará con un mensaje claro.
-    // ===================================================================
     function actualizarBotones() {
-      btnCal.A.disabled = false;                            // siempre activo
-      btnCal.B.disabled = !calibracion.A;                   // necesita A hecho
-      btnCal.C.disabled = !calibracion.B;                   // necesita B hecho
-      btnCal.Arriba.disabled = !calibracion.C;              // necesita C hecho
-      btnCal.Abajo.disabled = calibracion.zArriba === null; // necesita arriba hecho
+      btnCal.A.disabled = false;
+      btnCal.B.disabled = !calibracion.A;
+      btnCal.C.disabled = !calibracion.B;
+      btnCal.Arriba.disabled = !calibracion.C;
+      btnCal.Abajo.disabled = calibracion.zArriba === null;
     }
-    actualizarBotonesFn = actualizarBotones;
 
     function calibrarZona(letra) {
       if (!ultimaPosCenital) {
-        instrCal.textContent = "❌ No llegan datos del cenital al PC. Verifica que el teléfono cenital esté detectando tu mano (debería ver 'x: 0.XX' en su pantalla).";
+        instrCal.textContent = "❌ No llegan datos del cenital. Verifica que el telefono cenital este detectando tu mano.";
         return;
       }
       calibracion[letra] = { x: ultimaPosCenital.x, y: ultimaPosCenital.y };
@@ -258,28 +241,28 @@
       btnCal[letra].classList.add("done");
       zonaEls[letra].classList.add("calibrada");
 
-      if (letra === "A") instrCal.textContent = "✓ Zona A capturada en x=" + ultimaPosCenital.x.toFixed(2) + " y=" + ultimaPosCenital.y.toFixed(2) + ". Ahora pon el dedo sobre la zona B.";
-      else if (letra === "B") instrCal.textContent = "✓ Zona B capturada. Ahora pon el dedo sobre la zona C.";
-      else if (letra === "C") instrCal.textContent = "✓ Zona C capturada. Ahora pon el dedo ARRIBA (sin tocar la mesa).";
+      if (letra === "A") instrCal.textContent = "✓ Zona A capturada. Pon el dedo sobre la zona B.";
+      else if (letra === "B") instrCal.textContent = "✓ Zona B capturada. Pon el dedo sobre la zona C.";
+      else if (letra === "C") instrCal.textContent = "✓ Zona C capturada. Pon el dedo ARRIBA (sin tocar la mesa).";
 
       actualizarBotones();
     }
 
     function calibrarAltura(cual) {
       if (!ultimaAlturaFrontal) {
-        instrCal.textContent = "❌ No llegan datos del frontal al PC. Verifica que el teléfono frontal esté detectando tu mano (debería ver 'altura z' en su pantalla).";
+        instrCal.textContent = "❌ No llegan datos del frontal. Verifica que el telefono frontal este detectando tu mano.";
         return;
       }
       if (cual === "arriba") {
         calibracion.zArriba = ultimaAlturaFrontal.z;
-        btnCal.Arriba.textContent = "✓ Dedo arriba: " + ultimaAlturaFrontal.z.toFixed(2);
+        btnCal.Arriba.textContent = "✓ Arriba: " + ultimaAlturaFrontal.z.toFixed(2);
         btnCal.Arriba.classList.add("done");
-        instrCal.textContent = "✓ Altura 'arriba' = " + ultimaAlturaFrontal.z.toFixed(2) + ". Ahora pon el dedo TOCANDO la mesa.";
+        instrCal.textContent = "✓ Altura arriba capturada. Ahora pon el dedo TOCANDO la mesa.";
       } else {
         calibracion.zAbajo = ultimaAlturaFrontal.z;
-        btnCal.Abajo.textContent = "✓ Dedo abajo: " + ultimaAlturaFrontal.z.toFixed(2);
+        btnCal.Abajo.textContent = "✓ Abajo: " + ultimaAlturaFrontal.z.toFixed(2);
         btnCal.Abajo.classList.add("done");
-        instrCal.textContent = "✅ Calibración completa. Toca las zonas del tablero.";
+        instrCal.textContent = "✅ Calibracion completa. Toca las zonas del tablero.";
       }
       actualizarBotones();
     }
@@ -311,7 +294,6 @@
     function detectarZona(x, y) {
       let zonaMasCerca = null;
       let distanciaMin = RADIO_ZONA;
-
       for (const nombre of ["A", "B", "C"]) {
         const c = calibracion[nombre];
         if (!c) continue;
@@ -342,17 +324,16 @@
                             calibracion.zArriba !== null && calibracion.zAbajo !== null;
 
       if (!todoCalibrado) {
-        estadoFusion.textContent = "Completa la calibración para empezar a tocar";
+        estadoFusion.textContent = "Completa la calibracion para empezar a tocar";
         return;
       }
 
-      if (!ultimaPosCenital || !ultimaAlturaFrontal) {
-        return;
-      }
+      if (!ultimaPosCenital || !ultimaAlturaFrontal) return;
+
       if (ahora - ultimaPosCenital.t > VENTANA_MS ||
           ahora - ultimaAlturaFrontal.t > VENTANA_MS) {
         limpiarZonas();
-        estadoFusion.textContent = "Buscando dedo en ambas cámaras...";
+        estadoFusion.textContent = "Buscando dedo en ambas camaras...";
         return;
       }
 
@@ -361,9 +342,7 @@
 
       limpiarZonas();
 
-      if (zonaCenital) {
-        zonaEls[zonaCenital].classList.add("hover");
-      }
+      if (zonaCenital) zonaEls[zonaCenital].classList.add("hover");
 
       if (zonaCenital && tocando) {
         zonaEls[zonaCenital].classList.remove("hover");
@@ -371,7 +350,7 @@
         estadoFusion.textContent = "✓ TOQUE confirmado en zona " + zonaCenital;
         estadoFusion.style.color = "#16a34a";
       } else if (zonaCenital) {
-        estadoFusion.textContent = "👆 Hover en " + zonaCenital + " — acerca el dedo a la mesa";
+        estadoFusion.textContent = "👆 Hover en " + zonaCenital + " - acerca el dedo a la mesa";
         estadoFusion.style.color = "#92400e";
       } else {
         estadoFusion.textContent = "Mueve el dedo a una zona";
