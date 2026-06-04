@@ -15,6 +15,7 @@
       font-size: 28px; margin: 10px 0; color: #2a7; font-weight: bold;
     }
     #lecturas { font-size: 12px; color: #888; }
+    #envios { font-size: 12px; color: #2a7; }
   </style>
 </head>
 <body>
@@ -23,13 +24,16 @@
   <div id="instr">Altura del dedo sobre la mesa. Pon este teléfono en la Base A1.</div>
   <div id="valor">—</div>
   <div id="lecturas">Lecturas: 0</div>
+  <div id="envios">Envíos al PC: 0</div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
     const valorEl = document.getElementById("valor");
     const lecturasEl = document.getElementById("lecturas");
+    const enviosEl = document.getElementById("envios");
     let contador = 0;
+    let contadorEnvios = 0;
 
     async function elegirYIniciar() {
       try {
@@ -82,16 +86,16 @@
         return;
       }
 
-      // En la cámara FRONTAL, la 'y' del frame representa la ALTURA del
-      // dedo respecto al suelo: y=0 (arriba del frame) = dedo arriba,
-      // y=1 (abajo del frame) = dedo cerca de la mesa.
       let y = p.y;
       if (y > 1) y = y / 480;
 
-      // Llamamos esto "z" porque conceptualmente es la altura
       valorEl.textContent = "altura z: " + y.toFixed(2);
 
-      Protobject.Core.send({ tipo: "frontal", z: y }).to("index.html");
+      const mensaje = { tipo: "frontal", z: y };
+      Protobject.Core.send(mensaje).to("index.html");
+
+      contadorEnvios++;
+      enviosEl.textContent = "Envíos al PC: " + contadorEnvios;
     });
   </script>
 

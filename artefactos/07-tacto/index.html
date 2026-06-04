@@ -56,11 +56,6 @@
       transform: scale(1.05);
       color: #065f46;
     }
-    .zona.calibrando {
-      border-color: #3b82f6;
-      background: #dbeafe;
-      color: #1e3a8a;
-    }
     .zona .check {
       font-size: 1.5rem;
       color: #16a34a;
@@ -74,7 +69,6 @@
       min-height: 1.5em;
     }
 
-    /* Panel de calibración */
     #panel-calibracion {
       background: #fff;
       border: 2px solid #3b82f6;
@@ -169,31 +163,67 @@
 
   <script>
     // ===================================================================
-    // RADIO DE CADA ZONA (en coordenadas normalizadas de la cámara)
-    // Después de calibrar, cada zona es un círculo de este radio alrededor
-    // del punto capturado. Sube si tus zonas físicas son grandes, baja si
-    // son pequeñas o muy juntas.
+    // FIX CRÍTICO: Registrar onReceived ANTES de cualquier otra lógica.
+    // Si el callback se registra al final del script, los teléfonos se
+    // conectan antes y Protobject se queja:
+    // "New connection, but no callback registered"
     // ===================================================================
-    const RADIO_ZONA = 0.18;
-
-    // Ventana de tiempo para considerar lecturas simultáneas
-    const VENTANA_MS = 250;
-
-    // ===================================================================
-    // ESTADO DE CALIBRACIÓN
-    // ===================================================================
-    let calibracion = {
-      A: null,        // {x, y}
-      B: null,
-      C: null,
-      zArriba: null,  // altura del dedo cuando NO está tocando
-      zAbajo: null    // altura del dedo cuando SÍ está tocando
-    };
 
     let ultimaPosCenital = null;
     let ultimaAlturaFrontal = null;
     let cenitalConectado = false;
     let frontalConectado = false;
+    let actualizarFn = null;
+    let actualizarBotonesFn = null;
+
+    Protobject.Core.onReceived((msg) => {
+      console.log("PC RECIBIÓ:", msg);
+
+      if (!msg || !msg.tipo) return;
+
+      if (msg.tipo === "cenital") {
+        ultimaPosCenital = { x: msg.x, y: msg.y, t: Date.now() };
+        if (!cenitalConectado) {
+          cenitalConectado = true;
+          const el = document.getElementById("conCenital");
+          if (el) {
+            el.textContent = "📱 Cenital: ✓ conectado";
+            el.classList.add("ok");
+          }
+          if (actualizarBotonesFn) actualizarBotonesFn();
+        }
+      }
+      else if (msg.tipo === "frontal") {
+        ultimaAlturaFrontal = { z: msg.z, t: Date.now() };
+        if (!frontalConectado) {
+          frontalConectado = true;
+          const el = document.getElementById("conFrontal");
+          if (el) {
+            el.textContent = "📱 Frontal: ✓ conectado";
+            el.classList.add("ok");
+          }
+          if (actualizarBotonesFn) actualizarBotonesFn();
+        }
+      }
+
+      if (actualizarFn) actualizarFn();
+    });
+
+    console.log("PC: callback onReceived registrado, listo para recibir conexiones");
+
+    // ===================================================================
+    // CONFIGURACIÓN
+    // ===================================================================
+    const RADIO_ZONA = 0.18;
+    const VENTANA_MS = 250;
+
+    let calibracion = {
+      A: null,
+      B: null,
+      C: null,
+      zArriba: null,
+      zAbajo: null
+    };
 
     const zonaEls = {
       A: document.getElementById("zonaA"),
@@ -217,6 +247,7 @@
       btnCal.Arriba.disabled = !frontalConectado || !calibracion.C;
       btnCal.Abajo.disabled = !frontalConectado || calibracion.zArriba === null;
     }
+    actualizarBotonesFn = actualizarBotones;
 
     function calibrarZona(letra) {
       if (!ultimaPosCenital) {
@@ -257,7 +288,6 @@
     function reiniciarCalibracion() {
       calibracion = { A: null, B: null, C: null, zArriba: null, zAbajo: null };
       for (const k of ["A", "B", "C"]) {
-        btnCal[k].textContent = ["", "1", "2", "3"][["A","B","C"].indexOf(k) + 1] + ". Calibrar zona " + k;
         btnCal[k].classList.remove("done");
         zonaEls[k].classList.remove("calibrada");
       }
@@ -279,9 +309,6 @@
     btnCal.Abajo.addEventListener("click", () => calibrarAltura("abajo"));
     document.getElementById("btnReset").addEventListener("click", reiniciarCalibracion);
 
-    // ===================================================================
-    // DETECCIÓN DE ZONA POR DISTANCIA AL CENTRO CALIBRADO
-    // ===================================================================
     function detectarZona(x, y) {
       let zonaMasCerca = null;
       let distanciaMin = RADIO_ZONA;
@@ -302,9 +329,7 @@
 
     function estaTocando(z) {
       if (calibracion.zArriba === null || calibracion.zAbajo === null) return false;
-      // Umbral en el punto medio entre arriba y abajo
       const umbral = (calibracion.zArriba + calibracion.zAbajo) / 2;
-      // Si zAbajo > zArriba (común: y crece hacia abajo en imagen), tocar = z > umbral
       if (calibracion.zAbajo > calibracion.zArriba) {
         return z >= umbral;
       } else {
@@ -354,40 +379,13 @@
         estadoFusion.style.color = "#6b7280";
       }
     }
+    actualizarFn = actualizar;
 
     function limpiarZonas() {
       for (const k in zonaEls) {
         zonaEls[k].classList.remove("hover", "activa");
       }
     }
-
-    // ===================================================================
-    // RECIBIR DATOS DE LOS TELÉFONOS
-    // ===================================================================
-    Protobject.Core.onReceived((msg) => {
-      if (!msg || !msg.tipo) return;
-
-      if (msg.tipo === "cenital") {
-        ultimaPosCenital = { x: msg.x, y: msg.y, t: Date.now() };
-        if (!cenitalConectado) {
-          cenitalConectado = true;
-          document.getElementById("conCenital").textContent = "📱 Cenital: ✓ conectado";
-          document.getElementById("conCenital").classList.add("ok");
-          actualizarBotones();
-        }
-      }
-      else if (msg.tipo === "frontal") {
-        ultimaAlturaFrontal = { z: msg.z, t: Date.now() };
-        if (!frontalConectado) {
-          frontalConectado = true;
-          document.getElementById("conFrontal").textContent = "📱 Frontal: ✓ conectado";
-          document.getElementById("conFrontal").classList.add("ok");
-          actualizarBotones();
-        }
-      }
-
-      actualizar();
-    });
 
     setInterval(actualizar, 100);
     actualizarBotones();
