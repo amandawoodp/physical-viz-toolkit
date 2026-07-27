@@ -1,3 +1,11 @@
+<!--
+  Artefacto 11 · Sensor de movimiento
+  El teléfono, montado sobre un objeto que se sacude, usa su
+  acelerómetro para detectar sacudidas fuertes. Esta pantalla muestra
+  un VU-metro con la intensidad en vivo y cuenta cada sacudida
+  confirmada. Toda la lectura, calibración y detección de eventos
+  ocurren en sensor.html.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -109,6 +117,8 @@
     const umbralLinea = document.getElementById("umbral-linea");
     const subtituloEl = document.getElementById("subtitulo");
 
+    // Se registra ANTES que el resto de la lógica para no perder mensajes
+    // si el teléfono se conecta muy rápido ("New connection, but no callback registered").
     // El teléfono envía dos tipos de mensajes:
     //   { tipo: "nivel", intensidad: 0-100, umbral: 0-100 }
     //   { tipo: "evento" }

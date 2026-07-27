@@ -1,3 +1,10 @@
+<!--
+  Artefacto 08 · Panel táctil
+  Una tablet/teléfono con una lámina de cartón perforada encima actúa
+  como panel físico de botones: cada agujero coincide con un número en
+  pantalla. Esta página recibe qué número se tocó y lo muestra en
+  grande. Toda la interacción táctil ocurre en sensor.html.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -181,6 +188,11 @@
       displayEl.classList.add("pop");
     }
 
+    // Se registra ANTES que el resto de la lógica para no perder mensajes
+    // si la tablet se conecta muy rápido ("New connection, but no callback registered").
+    // sensor.html manda el número en tres formatos distintos (numero,
+    // marcador, valor) para que el estudiante pueda usar el que le
+    // resulte más cómodo; aquí basta con el primero disponible.
     Protobject.Core.onReceived((datos) => {
       if (!datos) return;
       mostrarNumero(datos.numero || datos.marcador || datos.valor);

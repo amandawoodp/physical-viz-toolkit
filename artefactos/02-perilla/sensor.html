@@ -1,3 +1,10 @@
+<!--
+  Artefacto 02 · Perilla giratoria — sensor (corre en el teléfono)
+  Lee el sensor de orientación (ángulo 'alpha', tipo brújula) y lo
+  acumula en un ángulo continuo relativo a un origen calibrado por el
+  usuario. Envía a index.html { angulo, vueltas } cada vez que cambia
+  lo suficiente.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -99,6 +106,8 @@
       }
       anguloPrevio = angulo;
 
+      // Conversión sensor → dato semántico: el PC nunca ve el alpha crudo,
+      // solo el ángulo relativo al origen calibrado y las vueltas completas.
       Protobject.Core.send({ angulo: angulo, vueltas: vueltas }).to("index.html");
     }
 
@@ -136,6 +145,9 @@
         instr.textContent = "Esperando lectura del sensor… gira un poco el teléfono.";
         return;
       }
+      // Calibración de un solo paso: se guarda el ángulo acumulado actual
+      // como "origen" (posición 0 de la perilla). Todo ángulo futuro se
+      // mide relativo a este origen.
       origen = acumulado;
       anguloPrevio = 0;
       instr.textContent = "✓ Calibrado. Gira el teléfono como una perilla.";

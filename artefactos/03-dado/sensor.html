@@ -1,3 +1,9 @@
+<!--
+  Artefacto 03 · Dado de decisión — sensor (corre en el teléfono)
+  Usa la cámara trasera para leer marcadores ArUco en el cubo. Cuando
+  una cara se mantiene estable el tiempo suficiente, envía su número
+  (1–6) a index.html.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -42,8 +48,6 @@
             break;
           }
         }
-        console.log("Usando cámara índice:", idxTrasera, camaras[idxTrasera]?.label);
-
         Protobject.Aruco.start(150, idxTrasera);
       } catch (err) {
         console.warn("Falló elección de cámara, uso 0 por defecto:", err);
@@ -131,7 +135,6 @@
         caraAnterior = cara;
         valorEl.textContent = "Cara: " + cara;
         Protobject.Core.send(cara).to("index.html");
-        console.log("Enviado al PC: cara =", cara);
       }
     });
   </script>

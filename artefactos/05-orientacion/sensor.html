@@ -1,3 +1,9 @@
+<!--
+  Artefacto 05 · Sensor de orientación — sensor (corre en el teléfono)
+  Lee la inclinación del teléfono ('beta') y, tras calibrar los dos
+  estados (libro cerrado / abierto), decide de qué lado del umbral está
+  la lectura actual. Envía "ON" u "OFF" a index.html solo cuando cambia.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -128,6 +134,10 @@
     }
 
     // ---- CALIBRACIÓN DE LOS DOS ESTADOS ----
+    // Paso "CERRADO": se captura el beta actual como valorOff.
+    // Paso "ABIERTO": se captura el beta actual como valorOn.
+    // Con ambos puntos, handler() puede calcular en qué lado del
+    // umbral está cualquier lectura futura.
     function calibrar(esOff, e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       if (ultimoBeta === null) {

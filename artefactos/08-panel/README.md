@@ -12,12 +12,11 @@ Esta versión base es deliberadamente genérica: usa solo los números **1, 2, 3
 - Cortacartón o tijeras
 - Cinta adhesiva o masking tape para fijar la plantilla
 - Plumones, papeles o materiales para decorar el panel
-- No requiere construcción electrónica adicional
 
 ## Cómo usar
 
 1. Coloca la tablet o smartphone sobre la mesa, con la **pantalla hacia arriba**.
-2. Abre la demo en el computador.
+2. Abre la demo en vivo en el computador.
 3. Click en "+ Conectar tablet". Aparece un código QR.
 4. Escanea el QR con la tablet o teléfono que funcionará como panel.
 5. En la tablet, toca **"Pantalla completa"**.
@@ -25,15 +24,9 @@ Esta versión base es deliberadamente genérica: usa solo los números **1, 2, 3
 7. Alinea los agujeros del cartón con los círculos numerados visibles en la pantalla.
 8. Toca a través de los agujeros. La pantalla del computador muestra el mismo número seleccionado.
 
-## Componente Protobject
+## Sensor Protobject utilizado
 
-`Protobject.Core.send()` — envía desde la tablet un evento semántico hacia `index.html` cada vez que el usuario toca uno de los números del panel.
-
-Este artefacto no usa cámara, orientación, NFC ni micrófono. La interacción ocurre directamente sobre la pantalla capacitiva de la tablet o teléfono.
-
-## Sensor y mapeo de datos
-
-Cada agujero corresponde a una zona táctil genérica. Al tocarla, el código envía un objeto simple, por ejemplo:
+Este artefacto no usa cámara, orientación, NFC ni micrófono: la interacción ocurre directamente sobre la pantalla capacitiva de la tablet o teléfono, y `Protobject.Core.send()` envía un evento semántico hacia `index.html` cada vez que el usuario toca uno de los números del panel:
 
 ```js
 {
@@ -46,19 +39,23 @@ Cada agujero corresponde a una zona táctil genérica. Al tocarla, el código en
 }
 ```
 
-El estudiante final puede usar `numero`, `marcador` o `valor` para conectar el panel con su propia visualización.
+El estudiante final puede usar `numero`, `marcador` o `valor` para conectar el panel con su propia visualización — se envían los tres formatos por comodidad, no hace falta usarlos todos.
 
-Las zonas base son **1**, **2**, **3**, **4**, **5** y **6**. Se dejaron sin nombres específicos para que cada grupo pueda decidir qué significa cada número en su propio proyecto.
+## Cómo adaptarlo a otros usos
 
-## Usos típicos
+El patrón "agujeros de cartón sobre una pantalla táctil, cada uno dispara un evento numerado" sirve para cualquier panel de botones físicos sin electrónica:
 
-- **Selector de categorías**: cada número representa una categoría definida por el grupo.
-- **Selector de dataset**: cada número cambia el conjunto de datos mostrado.
-- **Panel de control físico**: cada agujero activa una acción distinta.
-- **Mapa táctil pequeño**: cada número puede corresponder a una zona del mapa.
-- **Instrumento o secuenciador simple**: cada número dispara un sonido, estado o visualización.
+- **Mapa táctil**: dibuja o pega un mapa sobre el cartón y perfora un agujero por cada ciudad o región; cada número pasa a representar un lugar en vez de un dígito genérico.
+- **Instrumento o secuenciador simple**: cada agujero dispara un sonido o una nota distinta, útil para sonificación de datos.
+- **Panel de control de una visualización**: cada número cambia de vista, filtra una categoría, o cambia el dataset mostrado en una visualización más grande en el PC.
 
-## Notas
+Para adaptarlo, cambia las etiquetas visibles en los `.hole` de `sensor.html` (y los `.mini` de `index.html`) por las que necesite tu caso de uso; el mecanismo de envío y recepción no cambia.
+
+## Parámetros ajustables
+
+- **Cantidad y etiquetas de zonas** (`sensor.html` y `index.html`): la versión base trae 6 botones numerados 1–6. Agrega o quita elementos `.hole`/`.mini` con su `data-num` correspondiente para tener más o menos zonas, o cambia el texto visible para usar palabras/íconos en vez de números.
+
+## Notas técnicas
 
 - **El panel depende de la alineación física**, así que los agujeros del cartón deben coincidir bien con los círculos de la pantalla.
 - Conviene usar una tablet por su mayor área de interacción.
@@ -66,4 +63,4 @@ Las zonas base son **1**, **2**, **3**, **4**, **5** y **6**. Se dejaron sin nom
 - Los agujeros deben ser suficientemente grandes para que el dedo toque la pantalla con comodidad.
 - La pantalla debe estar desbloqueada y sin gestos del sistema que interfieran.
 - No requiere permisos de cámara, orientación, NFC ni micrófono.
-- El computador y la tablet deben estar conectados mediante Protobject.
+- El computador y la tablet deben estar en la misma red WiFi.

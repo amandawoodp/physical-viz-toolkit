@@ -1,3 +1,10 @@
+<!--
+  Artefacto 08 · Panel táctil — sensor (corre en la tablet/teléfono)
+  Muestra 6 botones circulares grandes, pensados para ser tocados a
+  través de agujeros recortados en una lámina de cartón. Al tocar uno,
+  envía su número a index.html. No usa ningún sensor de hardware: la
+  interacción es directamente la pantalla táctil capacitiva.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -127,6 +134,9 @@
     const botones = Array.from(document.querySelectorAll(".hole"));
     const fullscreenBtn = document.getElementById("fullscreenBtn");
 
+    // Conversión toque → dato semántico: se envía el número tocado en
+    // tres formatos (numero, marcador, valor) para que index.html (o la
+    // adaptación de cada estudiante) elija el que le acomode.
     function enviarNumero(num) {
       botones.forEach((b) => b.classList.toggle("active", b.dataset.num === String(num)));
 

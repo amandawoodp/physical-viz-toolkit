@@ -1,3 +1,10 @@
+<!--
+  Artefacto 05 · Sensor de orientación
+  El teléfono, fijo sobre la tapa de un libro, detecta si el libro está
+  abierto o cerrado según su inclinación. Esta pantalla muestra "ON"/"OFF"
+  y cambia el color de fondo para reforzar el estado. Toda la lectura y
+  calibración del sensor ocurre en sensor.html.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -65,6 +72,8 @@
   <script>
     let primerMensaje = false;
 
+    // Se registra ANTES que el resto de la lógica para no perder mensajes
+    // si el teléfono se conecta muy rápido ("New connection, but no callback registered").
     // El teléfono nos envía un string: "ON" o "OFF"
     Protobject.Core.onReceived((estado) => {
       const estadoEl = document.getElementById("estado");

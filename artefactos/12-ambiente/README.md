@@ -7,40 +7,44 @@ El usuario tapa o destapa la cámara del teléfono con la mano y la pantalla del
 - Smartphone (iPhone o Android con cámara)
 - Computador con navegador Chrome o Safari
 - Base A1 (Soporte vertical) o cualquier soporte que mantenga el teléfono apuntando hacia el espacio que se quiere monitorear
-- No requiere construcción adicional
 
 ## Cómo usar
 
 1. Coloca el teléfono sobre la Base A1, con la **cámara trasera apuntando hacia adelante** (hacia el espacio donde se interactuará).
-2. Abre [la demo en vivo](https://amandawoodp.github.io/physical-viz-toolkit/artefactos/12-ambiente/) en el computador.
+2. Abre la demo en vivo en el computador.
 3. Click en "+ Conectar teléfono". Aparece un código QR.
 4. Escanea el QR con el iPhone/Android y permite el acceso a la cámara.
-5. Espera a que el contador de lecturas empiece a subir en el teléfono.
+5. Espera a que el valor de brillo empiece a mostrarse en el teléfono.
 6. **Calibración en dos toques**:
    - Con la cámara viendo el ambiente normal → toca **"☀️ CON LUZ NORMAL"**.
    - Tapa la cámara con la mano → toca **"🌑 TAPANDO LA CÁMARA"**.
 7. Suelta. Tapa y destapa la cámara. La pantalla del PC alterna entre LUZ, PENUMBRA y SOMBRA con cambios de fondo y de ícono.
 
-## Componente Protobject
+## Sensor Protobject utilizado
 
-Este artefacto usa Protobject para conectar el teléfono con la pantalla del computador. El teléfono funciona como sensor y envía a `index.html` un evento semántico con la forma `{ estado, brillo }`.
+Este artefacto usa Protobject para conectar el teléfono con la pantalla del computador, pero la medición de luz **no** depende de un sensor de luz nativo (`Protobject.LightSensor`): `sensor.html` accede directamente a la cámara con `getUserMedia()`, dibuja cada frame en un `<canvas>` oculto y calcula el brillo promedio de sus píxeles.
 
-La medición de luz no depende de `Protobject.LightSensor`. En esta versión, `sensor.html` accede directamente a la cámara del teléfono con `getUserMedia()`, muestra una vista previa y calcula el brillo promedio de la imagen usando un `canvas`.
+El teléfono toma lecturas periódicas (cada `INTERVALO_MS`) y calcula un número de brillo promedio, típicamente entre 0 y 255. El código aplica suavizado exponencial para evitar parpadeo, divide el rango calibrado entre los dos extremos en tres tercios y clasifica cada lectura en uno de tres estados: **luz**, **penumbra** o **sombra**. El estudiante final solo recibe el evento semántico `{ estado, brillo }`, nunca el flujo crudo de brillos.
 
-## Sensor y mapeo de datos
+## Cómo adaptarlo a otros usos
 
-El teléfono toma lecturas periódicas desde la cámara y calcula un número de brillo promedio, típicamente entre 0 y 255. El código aplica suavizado exponencial para evitar parpadeo, divide el rango calibrado entre los dos extremos en tres tercios y clasifica cada lectura en uno de tres estados: **luz**, **penumbra** o **sombra**.
+El patrón "brillo de la cámara clasificado en niveles calibrados" sirve para cualquier interacción basada en tapar/destapar o cambios de iluminación:
 
-El estudiante final solo recibe el evento semántico `{ estado, brillo }`, nunca el flujo crudo de brillos.
+- **Detector de presencia**: pasar la mano cerca del teléfono activa o desactiva una visualización, sin necesitar un sensor de proximidad dedicado.
+- **Día y noche**: cambia la metáfora visual de una visualización al apagar la luz de la habitación, simulando un ciclo día/noche.
+- **Caja sorpresa**: mete el teléfono dentro de una caja con tapa — abrir la tapa = luz, cerrar = sombra — para revelar contenido al abrir.
+- **Sensor de cercanía aproximada**: aunque no es un sensor de profundidad, acercar un objeto a la cámara reduce el brillo y se puede usar como señal de "algo está cerca".
 
-## Usos típicos
+Para adaptarlo, cambia qué representa cada estado (`luz`/`penumbra`/`sombra`) en `index.html`; la captura de cámara y clasificación en tercios de `sensor.html` no cambian.
 
-- **Detector de presencia**: pasar la mano cerca del teléfono activa o desactiva una visualización.
-- **Día y noche**: cambiar la metáfora visual al apagar la luz de la habitación.
-- **Caja sorpresa**: meter el teléfono dentro de una caja con tapa, abrir la tapa = luz, cerrar = sombra.
-- **Sensor de cercanía aproximada**: aunque no es un sensor de profundidad, acercar un objeto a la cámara reduce el brillo y se puede usar como "alguien está cerca".
+## Parámetros ajustables
 
-## Notas
+Ambos están en `sensor.html`:
+
+- **`SUAVIZADO`** (default 0.3, rango 0–1): suavizado exponencial del brillo leído. Más alto = lectura más estable pero más lenta para reaccionar a cambios reales; más bajo = más sensible pero puede "temblar".
+- **`INTERVALO_MS`** (default 200): cada cuántos milisegundos se toma y procesa un frame de la cámara. Bájalo para una respuesta más inmediata; súbelo para ahorrar batería/CPU.
+
+## Notas técnicas
 
 - **El sensor usa la cámara**, así que no funciona bien al mismo tiempo que otros artefactos que usen la cámara (slider, dado).
 - Buena iluminación general en el espacio: si la sala está poco iluminada de base, el rango entre "luz" y "sombra" es chico y los tres estados quedan muy cerca.

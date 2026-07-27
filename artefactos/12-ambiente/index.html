@@ -1,3 +1,10 @@
+<!--
+  Artefacto 12 · Sensor de ambiente
+  El teléfono usa su cámara como sensor de luz: mide el brillo promedio
+  de la imagen para distinguir luz, penumbra y sombra. Esta pantalla
+  recibe ese estado y cambia de color e ícono. Toda la lectura y
+  calibración ocurren en sensor.html.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -114,6 +121,9 @@
       }
     };
 
+    // Se registra ANTES que el resto de la lógica para no perder mensajes
+    // si el teléfono se conecta muy rápido ("New connection, but no callback registered").
+    // El teléfono envía { estado: "luz"|"penumbra"|"sombra", brillo: 0-255 }.
     Protobject.Core.onReceived((datos) => {
       if (!datos || !datos.estado) return;
 

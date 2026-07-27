@@ -1,3 +1,11 @@
+<!--
+  Artefacto 09 · Balanza de datos — sensor (corre en el teléfono)
+  El teléfono, atravesado por el eje central de una balanza LEGO
+  Technic, se inclina junto con el brazo. Se lee esa inclinación
+  ('gamma'), se calibra contra tres puntos (equilibrio, máximo
+  izquierda, máximo derecha) y se envía a index.html un porcentaje de
+  desbalance de -100 (izquierda) a +100 (derecha).
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -110,6 +118,10 @@
 
     let desbalanceSuavizado = 0;
 
+    // Conversión sensor → dato semántico: gamma crudo se normaliza entre
+    // los tres puntos calibrados (por separado hacia cada lado), se
+    // limpia con zona muerta y suavizado, y se envía como un porcentaje
+    // con signo (-100 a +100).
     function handler(event) {
       if (event.gamma === null) return;
       ultimoGamma = event.gamma;
@@ -187,6 +199,8 @@
       }
 
       if (pasoActual === 0) {
+        // Paso 1 de calibración: gamma con la balanza en equilibrio.
+        // Este será el 0% de desbalance.
         equilibrio = ultimoGamma;
         pasoActual = 1;
         paso1El.classList.add("done");
@@ -194,6 +208,8 @@
         instr.textContent = "Paso 2 de 3: Pon todo el peso en el platillo IZQUIERDO (inclinación máxima a la izq) y toca.";
       }
       else if (pasoActual === 1) {
+        // Paso 2: gamma en la inclinación máxima hacia la izquierda.
+        // Este será el -100% de desbalance.
         maxIzquierda = ultimoGamma;
         pasoActual = 2;
         paso2El.classList.add("done");
@@ -201,6 +217,8 @@
         instr.textContent = "Paso 3 de 3: Pon todo el peso en el platillo DERECHO (inclinación máxima a la der) y toca.";
       }
       else if (pasoActual === 2) {
+        // Paso 3: gamma en la inclinación máxima hacia la derecha.
+        // Este será el +100% de desbalance.
         maxDerecha = ultimoGamma;
         pasoActual = 3;
         paso3El.classList.add("done");

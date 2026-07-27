@@ -1,3 +1,10 @@
+<!--
+  Artefacto 11 · Sensor de movimiento — sensor (corre en el teléfono)
+  Usa Protobject.Acceleration (acelerómetro) para leer la magnitud del
+  movimiento. Tras calibrar dos referencias (reposo y sacudida fuerte),
+  normaliza cada lectura a 0-100% y confirma un "evento" cuando el
+  movimiento se sostiene por encima del umbral el tiempo suficiente.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -17,7 +24,6 @@
     #valor {
       font-size: 45px; margin: 20px 0; color: #2a7; font-weight: bold;
     }
-    #lecturas { font-size: 13px; color: #888; }
     button {
       display: block; width: 100%; padding: 20px; font-size: 19px;
       font-weight: bold; border: none; border-radius: 14px;
@@ -36,7 +42,6 @@
   <div id="instr">Toca el botón rojo para activar el acelerómetro.</div>
 
   <div id="valor">—</div>
-  <div id="lecturas">Lecturas: 0</div>
 
   <button id="calReposo" class="cal" style="display:none">🛑 GRABAR REPOSO</button>
   <button id="calSacudida" class="cal" style="display:none">💥 GRABAR SACUDIDA FUERTE</button>
@@ -46,13 +51,11 @@
   <script>
     const instr = document.getElementById("instr");
     const valorEl = document.getElementById("valor");
-    const lecturasEl = document.getElementById("lecturas");
     const btnPermiso = document.getElementById("permiso");
     const btnReposo = document.getElementById("calReposo");
     const btnSacudida = document.getElementById("calSacudida");
 
     // Estado
-    let contadorLecturas = 0;
     let ultimaMagnitud = null;
     let pico = 0;                  // pico máximo desde la última actualización
     let valorReposo = null;        // magnitud típica con el teléfono quieto
@@ -97,9 +100,6 @@
     // (sqrt(x²+y²+z²)) en reposo es ~9.8. Cualquier movimiento se
     // suma a esa base. Por eso medimos la diferencia respecto al reposo.
     Protobject.Acceleration.onData((data) => {
-      contadorLecturas++;
-      lecturasEl.textContent = "Lecturas: " + contadorLecturas;
-
       const magnitud = Math.sqrt(data.x * data.x + data.y * data.y + data.z * data.z);
       ultimaMagnitud = magnitud;
       valorEl.textContent = magnitud.toFixed(1);
@@ -109,6 +109,8 @@
         let pct = (magnitud - valorReposo) / (valorSacudida - valorReposo) * 100;
         pct = Math.max(0, Math.min(100, pct));
 
+        // Umbral fijo al 60% del rango calibrado. Súbelo si movimientos
+        // suaves se cuentan como sacudida; bájalo si cuesta detectarla.
         const umbralPct = 60;
 
         Protobject.Core.send({ tipo: "nivel", intensidad: pct, umbral: umbralPct }).to("index.html");

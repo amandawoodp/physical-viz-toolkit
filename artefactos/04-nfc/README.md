@@ -8,13 +8,9 @@ El usuario acerca diferentes tarjetas NFC al teléfono y la pantalla del computa
 - Computador con navegador Chrome o Safari
 - 1 a 4 tarjetas NFC del bolsillo del usuario: Bip!, TUC, TNE, carnet, tarjeta bancaria, credencial de trabajo, etc.
 
-## ⚠️ Compatibilidad
-
-**Este artefacto NO funciona en iPhone.** Apple bloquea Web NFC en Safari iOS a nivel de sistema. Se requiere obligatoriamente Android con Chrome (versión 89 o superior). Esta es una limitación del ecosistema, no de Protobject.
-
 ## Cómo usar
 
-1. Abre [la demo en vivo](https://amandawoodp.github.io/physical-viz-toolkit/artefactos/04-nfc/) en el computador.
+1. Abre la demo en vivo en el computador.
 2. Click en "+ Conectar teléfono". Aparece un código QR.
 3. Escanea el QR con un Android usando Chrome.
 4. En el Android, toca **"INICIAR LECTOR NFC"**. Chrome pedirá permiso para escanear NFC → permítelo.
@@ -25,26 +21,40 @@ El usuario acerca diferentes tarjetas NFC al teléfono y la pantalla del computa
 
 Las tarjetas aprendidas se guardan en el navegador del teléfono (`localStorage`), por lo que la próxima vez que abras el sensor ya las recordará. Para empezar de cero, usa el botón "BORRAR TARJETAS APRENDIDAS".
 
-## Componente Protobject
+## Sensor Protobject utilizado
 
 `Protobject.NFC` — accede al chip NFC del teléfono vía la Web NFC API. Cada tarjeta NFC tiene un identificador único permanente; el componente lo expone como un string en el callback `onData`.
 
-## Sensor y mapeo de datos
-
-ID único del tag NFC detectado → comparación con los IDs aprendidos → nombre de la tarjeta ("Bip!", "TUC", "TNE", "Carnet" o "Desconocida") → mensaje al PC → texto + color + ícono en pantalla.
+ID único del tag NFC detectado → comparación con los IDs aprendidos (guardados en `localStorage`) → nombre de la tarjeta ("Bip!", "TUC", "TNE", "Carnet" o "Desconocida") → mensaje al PC → texto + color + ícono en pantalla.
 
 El evento que se envía al PC es **el nombre semántico** de la tarjeta, no el ID crudo. El estudiante final nunca trabaja con strings de hardware del tipo `04:A1:B2:C3:D4:E5`.
 
-## Usos típicos
+## Cómo adaptarlo a otros usos
 
-- **Tarjeta como selector**: cada tarjeta = un dataset distinto (ej: "TUC → datos de la PUC", "Bip! → datos del Transantiago").
+El patrón "objeto físico con identidad única, se reconoce al acercarlo" sirve para cualquier selector por identidad:
+
+- **Tarjeta como selector de dataset**: cada tarjeta = un dataset distinto (ej. "TUC → datos de la PUC", "Bip! → datos del Transantiago").
 - **Tag NFC pegado a un objeto**: pega un tag dentro de un libro, juguete o llavero. El visitante acerca el objeto completo, no una tarjeta anónima. Esto tiene el máximo valor semántico: el objeto mismo activa la visualización.
-- **Identificación de usuario en una experiencia museo**: cada visitante usa su propia credencial para "loguear" su recorrido.
+- **Identificación de usuario en una experiencia de museo**: cada visitante usa su propia credencial para "loguear" su recorrido.
 
-## Notas
+Para adaptarlo, cambia la lista `TARJETAS` en `sensor.html` (los nombres que se van a aprender) y el objeto `estilos` en `index.html` (color e ícono por nombre).
+
+## Parámetros ajustables
+
+- **`TARJETAS`** (`sensor.html`): lista de nombres de tarjetas a diferenciar. Agrega o quita nombres según cuántas tarjetas/objetos quieras reconocer.
+- **`estilos`** (`index.html`): color e ícono asociados a cada nombre de tarjeta. Debe tener una entrada por cada nombre en `TARJETAS`, más `"Desconocida"` como respaldo.
+
+## Notas técnicas
 
 - **No requiere construir un artefacto físico**. El teléfono se apoya en el Soporte de escritorio (Base A1) o en una Base B, con un letrero de cartón al lado que diga "ACERCA TU TARJETA AQUÍ".
+- **Este artefacto NO funciona en iPhone.** Apple bloquea Web NFC en Safari iOS a nivel de sistema. Se requiere obligatoriamente Android con Chrome (versión 89 o superior). Esta es una limitación del ecosistema, no de Protobject.
 - **El NFC no atraviesa metal.** No pegues tags dentro de tazas metálicas o sobre objetos de aluminio.
 - **El sensor NFC del Android suele estar cerca de la cámara trasera**, no en el centro del aparato. Si una tarjeta no se detecta, prueba acercarla a distintos puntos de la parte de atrás del teléfono.
 - Cada tarjeta NFC tiene un ID único permanente, así que **una tarjeta nunca se confunde con otra**, ni siquiera entre dos tarjetas del mismo tipo (dos Bip! tienen IDs distintos).
 - El teléfono y el computador deben estar en la misma red WiFi.
+
+**IMPORTANTE — Sobre la fase de aprendizaje de tarjetas:**
+
+Este artefacto tiene un modo "aprendizaje" donde se acerca cada tarjeta al teléfono para registrar su ID (botón "ENTRAR EN MODO APRENDIZAJE" en `sensor.html`). Sin embargo, también puede realizarse de la siguiente manera:
+
+Extraer el ID de la tarjeta usando un lector NFC externo (una app tipo "NFC Tools" en Android, o el propio smartphone con otra app) y guardarlo directamente en el almacenamiento local del teléfono, en lugar de aprender la tarjeta desde la propia app. En el código, las tarjetas aprendidas se guardan en la variable `tarjetas` (objeto `{ nombre: id }`) y se persisten en `localStorage` bajo la clave `"nfcTarjetas"`; agregar manualmente un ID a ese objeto (por ejemplo desde la consola del navegador del teléfono, con `localStorage.setItem("nfcTarjetas", JSON.stringify({ "Bip!": "04:A1:B2:..." }))`) tiene el mismo efecto que "aprenderla" desde la app. Esto es útil especialmente cuando la tarjeta responde bien a lectores externos pero no a Web NFC.

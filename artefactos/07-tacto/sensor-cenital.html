@@ -1,9 +1,15 @@
+<!--
+  Artefacto 07 · Superficie táctil — sensor CENITAL (corre en el teléfono)
+  Usa Protobject.HandSensor (MediaPipe) para detectar la mano y lee la
+  punta del dedo índice (landmark 8). Envía su posición X,Y a index.html,
+  que la usa para saber SOBRE QUÉ PUNTO está el dedo.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Sensor cenital V2</title>
+  <title>Sensor cenital</title>
   <style>
     body {
       font-family: sans-serif; padding: 15px; margin: 0;
@@ -13,26 +19,18 @@
     #valor {
       font-size: 24px; margin: 10px 0; color: #2a7; font-weight: bold;
     }
-    #lecturas { font-size: 12px; color: #888; }
-    #envios { font-size: 14px; color: #2a7; font-weight: bold; }
   </style>
 </head>
 <body>
 
-  <h2>📷 Cámara CENITAL V2</h2>
+  <h2>📷 Cámara CENITAL</h2>
   <div>Pon la mano frente a la cámara.</div>
   <div id="valor">—</div>
-  <div id="lecturas">Lecturas: 0</div>
-  <div id="envios">Envíos al PC: 0</div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
     const valorEl = document.getElementById("valor");
-    const lecturasEl = document.getElementById("lecturas");
-    const enviosEl = document.getElementById("envios");
-    let contador = 0;
-    let contadorEnvios = 0;
 
     async function elegirYIniciar() {
       try {
@@ -61,10 +59,10 @@
     }
     elegirYIniciar();
 
+    // La punta del dedo índice es el landmark 8 en el modelo de mano de
+    // MediaPipe. x,y vienen normalizados (0–1) respecto al frame de la
+    // cámara: eso es lo que index.html usa para ubicar los puntos.
     Protobject.HandSensor.onData((data) => {
-      contador++;
-      lecturasEl.textContent = "Lecturas: " + contador;
-
       if (!data || !data.landmarks || data.landmarks.length === 0) {
         valorEl.textContent = "Sin mano detectada";
         return;
@@ -90,9 +88,6 @@
       valorEl.textContent = "x: " + x.toFixed(2) + " y: " + y.toFixed(2);
 
       Protobject.Core.send({ tipo: "cenital", x: x, y: y }).to("index.html");
-
-      contadorEnvios++;
-      enviosEl.textContent = "Envíos al PC: " + contadorEnvios;
     });
   </script>
 

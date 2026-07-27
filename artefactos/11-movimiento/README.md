@@ -12,7 +12,7 @@ El usuario sacude, agita o golpea un objeto que tiene el teléfono incorporado. 
 ## Cómo usar
 
 1. Fija el teléfono dentro de la Base B sobre el objeto que se va a sacudir.
-2. Abre [la demo en vivo](https://amandawoodp.github.io/physical-viz-toolkit/artefactos/11-movimiento/) en el computador.
+2. Abre la demo en vivo en el computador.
 3. Click en "+ Conectar teléfono". Aparece un código QR.
 4. Escanea el QR con el iPhone/Android.
 5. Toca **"🤳 PEDIR PERMISO DE MOVIMIENTO"**. iOS pedirá permiso → permítelo.
@@ -24,44 +24,37 @@ El usuario sacude, agita o golpea un objeto que tiene el teléfono incorporado. 
    - El contador aumenta con cada sacudida fuerte detectada.
    - El fondo destella violeta brevemente al detectar.
 
-## Componente Protobject
+## Sensor Protobject utilizado
 
-`Protobject.Acceleration` — accede al acelerómetro del teléfono y entrega valores en los tres ejes (`x`, `y`, `z`) en m/s² cada N milisegundos.
+`Protobject.Acceleration` — accede al acelerómetro del teléfono y entrega, cada N milisegundos (`onData`), un vector tridimensional `{ x, y, z }` en m/s².
 
-## Sensor y mapeo de datos
+El código: calcula la **magnitud total** del vector (`sqrt(x² + y² + z²)`); la compara con el valor de **reposo** calibrado (que es ~9.8 m/s², la gravedad terrestre); **normaliza** al rango calibrado (reposo = 0%, sacudida fuerte = 100%); **detecta evento** cuando la intensidad supera el 60% del rango durante al menos `DURACION_MS` continuos; y **aplica cooldown** (`COOLDOWN_MS`) tras cada evento para evitar contar varias veces la misma sacudida.
 
-`Acceleration.onData({ x, y, z })` entrega un vector tridimensional. El código:
+Lo que se envía al PC son dos tipos de mensajes: `{ tipo: "nivel", intensidad, umbral }` para la barra animada, y `{ tipo: "evento" }` cuando se confirma una sacudida fuerte sostenida. El estudiante final nunca trabaja con los valores crudos del acelerómetro.
 
-1. Calcula la **magnitud total** del vector: `sqrt(x² + y² + z²)`.
-2. Compara esa magnitud con el valor de **reposo** calibrado (que es ~9.8 m/s², la gravedad terrestre).
-3. **Normaliza** al rango calibrado (reposo = 0%, sacudida fuerte = 100%).
-4. **Detecta evento** cuando la intensidad supera el 60% del rango durante al menos 80 ms continuos.
-5. **Aplica cooldown** de 400 ms tras cada evento para evitar contar varias veces la misma sacudida.
+## Cómo adaptarlo a otros usos
 
-Lo que se envía al PC son dos tipos de mensajes:
-- `{ tipo: "nivel", intensidad, umbral }` para la barra animada.
-- `{ tipo: "evento" }` cuando se confirma una sacudida fuerte sostenida.
+El patrón "magnitud de movimiento + confirmación de evento sostenido" sirve para cualquier interacción disparada por gesto físico:
 
-El estudiante final nunca trabaja con los valores crudos del acelerómetro.
+- **Objeto que se sacude o lanza**: la Base B acolchada dentro de una pelota de cartón, unas maracas con elementos sueltos, un peluche, un cubo antiestrés — cada sacudida dispara un evento.
+- **Base B en el brazo del usuario (vestible)**: el propio gesto corporal se convierte en input — lanzar algo imaginario, dar un golpe al aire, seguir un ritmo.
+- **Base B sobre un objeto que recibe impactos**: una caja, un panel, la membrana de un tambor. Cada golpe genera un evento, útil para sonificación o interacción rítmica.
+- **Métrica de intensidad emocional**: usa el nivel continuo (`tipo: "nivel"`) en vez del contador de eventos para medir con cuánta fuerza el usuario sacude el objeto, por ejemplo como proxy de "cuán de acuerdo estás".
 
-## Patrones de uso
+Para adaptarlo, cambia qué ocurre en `index.html` al recibir `{ tipo: "evento" }` o `{ tipo: "nivel" }`; la detección y calibración en `sensor.html` no dependen de qué signifique la sacudida.
 
-- **Objeto que se sacude o lanza**: la Base B acolchada dentro de una pelota de cartón, unas maracas con elementos sueltos, un peluche, un cubo antiestrés.
-- **Base B en el brazo del usuario** (vestible): el propio gesto corporal se convierte en input. El acto de lanzar algo imaginario, dar un golpe al aire, seguir un ritmo.
-- **Base B sobre un objeto que recibe impactos**: una caja, un panel, la membrana de un tambor. Cada golpe genera un evento.
+## Parámetros ajustables
 
-## Usos típicos
+Todos están en `sensor.html`:
 
-- **Contador de eventos físicos**: cuántas veces el visitante sacude una maraca antes de cansarse.
-- **Interacción rítmica**: golpear una caja al compás de algo.
-- **Detector de gesto corporal**: la Base B en el brazo lee el momento en que el usuario "lanza" algo invisible.
-- **Métrica de intensidad emocional**: ¿con cuánta fuerza sacudes el objeto cuando estás de acuerdo?
+- **`DURACION_MS`** (default 80): milisegundos que el movimiento debe sostenerse sobre el umbral antes de confirmarse como evento. Más bajo = más sensible; más alto = exige sacudidas más sostenidas.
+- **`COOLDOWN_MS`** (default 400): milisegundos de espera tras un evento antes de poder detectar el siguiente. Evita contar varias veces la misma sacudida. Súbelo si una sola sacudida se cuenta como varias.
+- **`umbralPct`** (dentro de `onData`, default 60): porcentaje del rango calibrado que un movimiento debe superar para contar como evento. Súbelo si movimientos suaves se cuentan como sacudida; bájalo si cuesta detectarla.
 
-## Notas importantes
+## Notas técnicas
 
 - **El acelerómetro incluye la gravedad**: en reposo la magnitud total es ~9.8 m/s². Por eso la calibración mide la diferencia respecto al reposo y no la aceleración absoluta.
 - **En iPhone es obligatorio** tocar el botón "PEDIR PERMISO DE MOVIMIENTO" antes de calibrar. Sin permiso el sensor no entrega datos.
-- Si los eventos se disparan demasiado rápido o no se disparan, ajustar `DURACION_MS` (más corto = más sensible) y `COOLDOWN_MS` (más largo = menos disparos seguidos) en `sensor.html`.
 - Para sacudidas violentas (lanzamientos, golpes fuertes), usar la **Base B acolchada** con esponjas o cartón en acordeón alrededor de la cuna para proteger el teléfono.
 - El teléfono y el computador deben estar en la misma red WiFi.
 - Probado en iPhone con Safari. En Android usar Chrome.

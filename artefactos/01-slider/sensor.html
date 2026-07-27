@@ -1,3 +1,9 @@
+<!--
+  Artefacto 01 · Slider óptico — sensor (corre en el teléfono)
+  Usa la cámara trasera para detectar un cubo ArUco dentro de un canal
+  de cartón, lo calibra entre dos extremos y envía a index.html un
+  entero 0–2 según en qué tercio del canal se encuentra el cubo.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -104,7 +110,6 @@
   <button id="btnFlash" class="secundario">Intentar activar flash</button>
 
   <div id="detalle">Buscando cubo ArUco...</div>
-  <div id="estado">Lecturas: 0</div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
 
@@ -112,17 +117,24 @@
     const instr = document.getElementById("instr");
     const valorEl = document.getElementById("valor");
     const detalle = document.getElementById("detalle");
-    const estadoEl = document.getElementById("estado");
     const btnCalibrar = document.getElementById("btnCalibrar");
     const btnReiniciar = document.getElementById("btnReiniciar");
     const btnFlash = document.getElementById("btnFlash");
     const fill = document.getElementById("fill");
 
+    // --- Parámetros ajustables ---
+    // Cuántas lecturas recientes se usan para calcular la mediana de la
+    // posición del cubo. Más alto = lectura más estable pero más lenta
+    // para reaccionar a un movimiento real.
     const LECTURAS_MEDIANA = 5;
+    // Cuántas lecturas seguidas deben "pedir" el mismo tercio (0/1/2) antes
+    // de aceptarlo como el nuevo valor. Evita que un ruido momentáneo
+    // dispare un cambio de valor.
     const LECTURAS_ESTABLES_PARA_CAMBIAR = 2;
+    // Cada cuántos ms se permite subir/bajar un paso en la animación
+    // gradual del valor enviado al PC (ver actualizarSlider).
     const INTERVALO_SALIDA_MS = 160;
 
-    let lecturas = 0;
     let ultimaLectura = null;
     let historial = [];
 
@@ -147,9 +159,6 @@
           "No veo el cubo. Mejora la luz o revisa que el marcador mire a la cámara.";
         return;
       }
-
-      lecturas++;
-      estadoEl.textContent = "Lecturas: " + lecturas;
 
       historial.push(punto);
 
@@ -214,80 +223,86 @@
         height: 255
       });
     }
+
+    // -----------------------------
+    // Flash/torch de la cámara (opcional, ayuda a que el ArUco se
+    // detecte mejor con poca luz). No todos los navegadores lo soportan.
+    // -----------------------------
     let flashActivo = false;
-let streamFlash = null;
+    let streamFlash = null;
 
-btnFlash.addEventListener("click", alternarFlash);
+    btnFlash.addEventListener("click", alternarFlash);
 
-btnFlash.addEventListener("touchstart", (e) => {
-  e.preventDefault();
-  alternarFlash();
-});
-
-async function alternarFlash() {
-  try {
-    if (flashActivo) {
-      apagarFlash();
-      return;
-    }
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      detalle.textContent = "Este navegador no permite controlar la cámara.";
-      return;
-    }
-
-    streamFlash = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: "environment" },
-        advanced: [{ torch: true }]
-      },
-      audio: false
+    btnFlash.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      alternarFlash();
     });
 
-    const track = streamFlash.getVideoTracks()[0];
+    async function alternarFlash() {
+      try {
+        if (flashActivo) {
+          apagarFlash();
+          return;
+        }
 
-    if (!track) {
-      detalle.textContent = "No se encontró una cámara compatible con flash.";
-      return;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          detalle.textContent = "Este navegador no permite controlar la cámara.";
+          return;
+        }
+
+        streamFlash = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            advanced: [{ torch: true }]
+          },
+          audio: false
+        });
+
+        const track = streamFlash.getVideoTracks()[0];
+
+        if (!track) {
+          detalle.textContent = "No se encontró una cámara compatible con flash.";
+          return;
+        }
+
+        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+
+        if (!capabilities.torch) {
+          detalle.textContent =
+            "Este navegador no permite activar el flash. Usa más luz externa.";
+          apagarFlash();
+          return;
+        }
+
+        await track.applyConstraints({
+          advanced: [{ torch: true }]
+        });
+
+        flashActivo = true;
+        btnFlash.textContent = "Apagar flash";
+        btnFlash.classList.add("done");
+
+        detalle.textContent = "Flash activado. Si el ArUco deja de verse, apágalo.";
+
+      } catch (err) {
+        console.warn("No se pudo activar flash:", err);
+
+        detalle.textContent =
+          "No se pudo activar el flash desde el navegador. Usa luz externa sobre el cubo.";
+      }
     }
 
-    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+    function apagarFlash() {
+      if (streamFlash) {
+        streamFlash.getTracks().forEach(track => track.stop());
+        streamFlash = null;
+      }
 
-    if (!capabilities.torch) {
-      detalle.textContent =
-        "Este navegador no permite activar el flash. Usa más luz externa.";
-      apagarFlash();
-      return;
+      flashActivo = false;
+      btnFlash.textContent = "Intentar activar flash";
+      btnFlash.classList.remove("done");
     }
 
-    await track.applyConstraints({
-      advanced: [{ torch: true }]
-    });
-
-    flashActivo = true;
-    btnFlash.textContent = "Apagar flash";
-    btnFlash.classList.add("done");
-
-    detalle.textContent = "Flash activado. Si el ArUco deja de verse, apágalo.";
-
-  } catch (err) {
-    console.warn("No se pudo activar flash:", err);
-
-    detalle.textContent =
-      "No se pudo activar el flash desde el navegador. Usa luz externa sobre el cubo.";
-  }
-}
-
-function apagarFlash() {
-  if (streamFlash) {
-    streamFlash.getTracks().forEach(track => track.stop());
-    streamFlash = null;
-  }
-
-  flashActivo = false;
-  btnFlash.textContent = "Intentar activar flash";
-  btnFlash.classList.remove("done");
-}
     elegirYIniciar();
 
     // -----------------------------
@@ -346,7 +361,11 @@ function apagarFlash() {
     }
 
     // -----------------------------
-    // Calibración
+    // Calibración: se capturan los dos extremos del canal.
+    // Paso 1 ("calibrar0"): posición del cubo en el extremo 0.
+    // Paso 2 ("calibrar2"): posición del cubo en el extremo 2. Con ambos
+    // puntos se calcula el eje dominante (X o Y) y la distancia entre
+    // extremos, que se usan luego para ubicar el cubo entre 0 y 2.
     // -----------------------------
     btnCalibrar.addEventListener("click", calibrar);
 
@@ -482,7 +501,11 @@ function apagarFlash() {
     }
 
     // -----------------------------
-    // Mapeo 0–2 y salida gradual
+    // Conversión sensor → dato semántico:
+    // la posición cruda del cubo (x,y en la cámara) se normaliza a un
+    // valor t entre 0 y 1 usando los extremos calibrados, y luego se
+    // discretiza en 3 casillas (0, 1, 2). binObjetivo/binActual generan
+    // una transición gradual (nunca salta directo de 0 a 2).
     // -----------------------------
     function actualizarSlider(punto, iniciarSinAnimacion = false) {
       const inicio = punto0[eje];
@@ -542,10 +565,7 @@ function apagarFlash() {
 
     function enviarValor(valor) {
       valorEl.textContent = valor;
-
       Protobject.Core.send(valor).to("index.html");
-
-      console.log("Slider envió:", valor);
     }
 
     function formatear(n) {

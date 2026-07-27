@@ -1,3 +1,10 @@
+<!--
+  Artefacto 01 · Slider óptico
+  El teléfono (cenital) ve un cubo ArUco deslizarse por un canal de cartón
+  y envía a esta pantalla un número entero 0–2 según su posición.
+  Este archivo (index.html) solo recibe y muestra ese número; toda la
+  detección y el cálculo ocurren en sensor.html.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -101,7 +108,6 @@
     <div class="paso" data-n="0">0</div>
     <div class="paso" data-n="1">1</div>
     <div class="paso" data-n="2">2</div>
-    <div class="paso" 
   </div>
 
   <script src="https://app.protobject.com/framework/p.js"></script>
@@ -113,6 +119,7 @@
 
     let primerMensajeRecibido = false;
 
+    // Actualiza el número grande y resalta el círculo correspondiente (0, 1 o 2).
     function pintar(valor) {
       salida.textContent = valor;
 
@@ -132,10 +139,11 @@
       }
     }
 
+    // Se registra ANTES que el resto de la lógica para no perder mensajes
+    // si el teléfono se conecta muy rápido ("New connection, but no callback registered").
     Protobject.Core.onReceived((mensaje) => {
-      // Soporta dos formatos:
-      // 1) número directo: 0, 1, 2, 3, 4
-      // 2) objeto: { valor: 0 }
+      // sensor.html puede enviar el valor como número directo (0, 1, 2)
+      // o envuelto en un objeto ({ valor: 0 }); aquí se soportan ambos.
       const valor =
         typeof mensaje === "object" && mensaje !== null
           ? Number(mensaje.valor)

@@ -1,3 +1,11 @@
+<!--
+  Artefacto 12 · Sensor de ambiente — sensor (corre en el teléfono)
+  No usa un sensor de luz nativo: accede a la cámara con getUserMedia(),
+  dibuja cada frame en un <canvas> oculto y calcula el brillo promedio
+  de sus píxeles. Tras calibrar dos referencias (luz normal y cámara
+  tapada), clasifica cada lectura en luz/penumbra/sombra y envía el
+  resultado a index.html.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -20,12 +28,6 @@
       margin-top: 20px;
       color: #333;
       line-height: 1.35;
-    }
-
-    #lecturas {
-      font-size: 14px;
-      color: #666;
-      margin-top: 8px;
     }
 
     #valor {
@@ -90,14 +92,6 @@
       display: none;
     }
 
-    #debug {
-      margin-top: 14px;
-      font-size: 12px;
-      color: #777;
-      line-height: 1.4;
-      word-break: break-word;
-    }
-
     canvas {
       display: none;
     }
@@ -107,7 +101,6 @@
 <body>
 
   <div id="instr">Inicializando cámara para medir luz...</div>
-  <div id="lecturas">Lecturas recibidas: 0</div>
 
   <div id="valor">—</div>
   <div id="estadoLocal">Esperando calibración</div>
@@ -122,13 +115,10 @@
   <video id="preview" autoplay playsinline muted></video>
   <canvas id="canvas" width="80" height="60"></canvas>
 
-  <div id="debug"></div>
-
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
     const instr = document.getElementById("instr");
-    const lecturasEl = document.getElementById("lecturas");
     const valorEl = document.getElementById("valor");
     const estadoLocalEl = document.getElementById("estadoLocal");
     const brilloFill = document.getElementById("brillo-fill");
@@ -137,23 +127,21 @@
     const video = document.getElementById("preview");
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    const debug = document.getElementById("debug");
 
     let ultimoBrillo = null;
     let brilloLuz = null;
     let brilloSombra = null;
     let estadoAnterior = null;
-    let contadorLecturas = 0;
+    let huboLectura = false;
 
+    // --- Parámetros ajustables ---
+    // Suavizado exponencial del brillo (0 = sin suavizado, cerca de 1 =
+    // muy estable pero lento para reaccionar).
     const SUAVIZADO = 0.3;
     let brilloSuavizado = 0;
 
+    // Cada cuántos ms se toma y procesa un frame de la cámara.
     const INTERVALO_MS = 200;
-
-    function escribirDebug(texto) {
-      debug.textContent = texto;
-      console.log(texto);
-    }
 
     function calcularBrilloPromedio() {
       if (!video.videoWidth || !video.videoHeight) {
@@ -183,13 +171,14 @@
       return suma / totalPixeles;
     }
 
+    // Conversión sensor → dato semántico: el brillo crudo del frame se
+    // suaviza, se ubica dentro del rango calibrado (luz↔sombra) dividido
+    // en tercios, y se clasifica en uno de tres estados.
     function procesarLectura(brightness) {
-      contadorLecturas++;
-      lecturasEl.textContent = "Lecturas recibidas: " + contadorLecturas;
-
       ultimoBrillo = brightness;
 
-      if (contadorLecturas === 1) {
+      if (!huboLectura) {
+        huboLectura = true;
         brilloSuavizado = brightness;
       } else {
         brilloSuavizado =
@@ -268,8 +257,6 @@
         btnLuz.style.display = "block";
         btnSombra.style.display = "block";
 
-        escribirDebug("Cámara iniciada correctamente.");
-
         setInterval(() => {
           const brillo = calcularBrilloPromedio();
 
@@ -283,10 +270,6 @@
 
         instr.textContent =
           "No se pudo iniciar la cámara. Revisa permisos del navegador.";
-
-        escribirDebug(
-          "Error cámara: " + err.name + " / " + err.message
-        );
       }
     }
 
@@ -303,6 +286,8 @@
       }
 
       if (esLuz) {
+        // Paso 1 de calibración: brillo con la cámara viendo el
+        // ambiente normal. Es uno de los dos extremos del rango.
         brilloLuz = brilloSuavizado;
 
         btnLuz.textContent =
@@ -314,6 +299,9 @@
           "Ahora tapa la cámara con la mano y toca 'TAPANDO LA CÁMARA'.";
 
       } else {
+        // Paso 2 de calibración: brillo con la cámara tapada. Es el
+        // otro extremo del rango; junto con brilloLuz define los
+        // tercios que usa procesarLectura() para clasificar el estado.
         brilloSombra = brilloSuavizado;
 
         btnSombra.textContent =

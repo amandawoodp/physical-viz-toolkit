@@ -1,3 +1,10 @@
+<!--
+  Artefacto 06 · Sensor de peso — sensor (corre en el teléfono)
+  El teléfono se apoya sobre un globo. Al apretar el globo lateralmente,
+  el teléfono se inclina; se lee esa inclinación ('beta'), se calibra
+  contra dos puntos (reposo y máximo) y se envía a index.html un
+  porcentaje 0-100 de intensidad de apriete.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -103,6 +110,9 @@
 
     let intensidadSuavizada = 0;
 
+    // Conversión sensor → dato semántico: el ángulo crudo (beta) se
+    // normaliza entre los dos puntos calibrados, se limpia con zona
+    // muerta y suavizado, y se envía como un porcentaje 0-100.
     function handler(event) {
       if (event.beta === null) return;
       ultimoBeta = event.beta;
@@ -177,7 +187,8 @@
       }
 
       if (pasoActual === 0) {
-        // Paso 1: capturar reposo (sin apretar)
+        // Paso 1 de calibración: se captura el beta con el globo en
+        // reposo (sin apretar). Este será el 0% de intensidad.
         betaReposo = ultimoBeta;
         pasoActual = 1;
         paso1El.classList.add("done");
@@ -185,7 +196,9 @@
         instr.textContent = "Paso 2 de 2: Aprieta el globo al MÁXIMO (todo lo que vas a apretarlo en uso real) y, mientras lo aprietas, toca el botón.";
       }
       else if (pasoActual === 1) {
-        // Paso 2: capturar máximo
+        // Paso 2 de calibración: se captura el beta apretando el globo
+        // al máximo. Este será el 100% de intensidad; junto con
+        // betaReposo define el rango que normaliza el handler().
         betaMaximo = ultimoBeta;
         pasoActual = 2;
         paso2El.classList.add("done");

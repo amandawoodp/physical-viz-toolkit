@@ -1,3 +1,10 @@
+<!--
+  Artefacto 10 · Sensor de ruido — sensor (corre en el teléfono)
+  Usa Protobject.NoiseSensor (micrófono) para leer intensidad acústica.
+  Tras calibrar dos referencias (silencio y sonido fuerte), normaliza
+  cada lectura a 0-100% y confirma un "evento" cuando el sonido se
+  sostiene por encima del umbral el tiempo suficiente.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -17,7 +24,6 @@
     #valor {
       font-size: 45px; margin: 20px 0; color: #2a7; font-weight: bold;
     }
-    #lecturas { font-size: 13px; color: #888; }
     button {
       display: block; width: 100%; padding: 20px; font-size: 19px;
       font-weight: bold; border: none; border-radius: 14px;
@@ -37,7 +43,6 @@
   <div id="instr">Toca "Iniciar micrófono" y permite el acceso.</div>
 
   <div id="valor">—</div>
-  <div id="lecturas">Lecturas: 0</div>
 
   <button id="calBase" class="cal" style="display:none" disabled>🤫 GRABAR RUIDO AMBIENTE</button>
   <button id="calFuerte" class="cal" style="display:none" disabled>👏 GRABAR SONIDO FUERTE</button>
@@ -47,13 +52,11 @@
   <script>
     const instr = document.getElementById("instr");
     const valorEl = document.getElementById("valor");
-    const lecturasEl = document.getElementById("lecturas");
     const btnIniciar = document.getElementById("iniciar");
     const btnBase = document.getElementById("calBase");
     const btnFuerte = document.getElementById("calFuerte");
 
     // Estado del sensor
-    let contadorLecturas = 0;
     let ultimaIntensidad = null;
     let ruidoBase = null;       // nivel de silencio ambiente
     let nivelFuerte = null;     // nivel de un sonido fuerte de referencia
@@ -90,8 +93,6 @@
 
     // ---- LECTURA ----
     Protobject.NoiseSensor.onData((intensity) => {
-      contadorLecturas++;
-      lecturasEl.textContent = "Lecturas: " + contadorLecturas;
       ultimaIntensidad = intensity;
       valorEl.textContent = Math.round(intensity);
 
@@ -101,7 +102,9 @@
         let pct = (intensity - ruidoBase) / (nivelFuerte - ruidoBase) * 100;
         pct = Math.max(0, Math.min(100, pct));
 
-        // Umbral fijo al 60% del rango calibrado
+        // Umbral fijo al 60% del rango calibrado. Súbelo si se detectan
+        // sonidos de fondo como eventos; bájalo si cuesta que se detecte
+        // un aplauso real.
         const umbralPct = 60;
 
         // Enviar la lectura para la barra animada

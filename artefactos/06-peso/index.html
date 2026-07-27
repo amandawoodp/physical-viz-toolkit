@@ -1,3 +1,10 @@
+<!--
+  Artefacto 06 · Sensor de peso
+  Un globo apretado lateralmente inclina el teléfono apoyado sobre él.
+  Esta pantalla recibe un porcentaje 0-100 de "cuánto se está apretando"
+  y lo muestra como una barra que crece. Toda la lectura, calibración y
+  suavizado del sensor ocurren en sensor.html.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -81,6 +88,8 @@
   <script>
     let primerMensaje = false;
 
+    // Se registra ANTES que el resto de la lógica para no perder mensajes
+    // si el teléfono se conecta muy rápido ("New connection, but no callback registered").
     // El teléfono envía un número entero 0-100 (porcentaje de presión)
     Protobject.Core.onReceived((intensidad) => {
       document.getElementById("barra-fill").style.height = intensidad + "%";

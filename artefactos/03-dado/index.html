@@ -1,3 +1,9 @@
+<!--
+  Artefacto 03 · Dado de decisión
+  El teléfono (cenital) identifica qué cara del Cubo ArUco queda hacia
+  arriba y envía un número 1–6 a esta pantalla, que lo muestra grande
+  con un color asociado. Toda la detección ocurre en sensor.html.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -57,8 +63,6 @@
   <script src="https://app.protobject.com/framework/p.js"></script>
 
   <script>
-    console.log("PC: registrando callback onReceived...");
-
     // Colores asociados a cada cara, para que al cambiar de número
     // la pantalla cambie también de color y se sienta "viva".
     const coloresPorCara = {
@@ -72,9 +76,9 @@
 
     let primerMensaje = false;
 
+    // Se registra ANTES que el resto de la lógica para no perder mensajes
+    // si el teléfono se conecta muy rápido ("New connection, but no callback registered").
     Protobject.Core.onReceived((cara) => {
-      console.log("PC recibió cara:", cara);
-
       const salida = document.getElementById("salida");
       salida.textContent = cara;
       salida.style.color = coloresPorCara[cara] || "#222";
@@ -85,6 +89,7 @@
 
       if (!primerMensaje) {
         primerMensaje = true;
+        console.log("Conexión establecida: primer mensaje recibido del teléfono.");
         document.getElementById("subtitulo").textContent = "✓ Teléfono conectado · lanza el cubo";
         document.getElementById("subtitulo").style.color = "#2a7";
       }

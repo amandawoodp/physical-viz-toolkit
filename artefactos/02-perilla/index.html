@@ -1,3 +1,10 @@
+<!--
+  Artefacto 02 · Perilla giratoria
+  El teléfono, fijo al centro de un disco de cartón, actúa como perilla:
+  al girarlo se acumula un ángulo continuo (puede pasar de 360°) que esta
+  pantalla dibuja como una flecha girando, junto al ángulo y el número
+  de vueltas. Toda la lectura del sensor ocurre en sensor.html.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -94,6 +101,8 @@
     let primerMensaje = false;
     let anguloPrevio = 0;
 
+    // Se registra ANTES que el resto de la lógica para no perder mensajes
+    // si el teléfono se conecta muy rápido ("New connection, but no callback registered").
     // El teléfono envía un objeto con dos cosas:
     //   { angulo: número, vueltas: número }
     // angulo = ángulo total acumulado desde la calibración (puede ser
@@ -111,9 +120,9 @@
       // Mostrar sentido del último movimiento + número de vueltas
       const dif = angulo - anguloPrevio;
       if (Math.abs(dif) > 1) {
-        const flecha = dif > 0 ? "↻ Horario" : "↺ Antihorario";
+        const textoSentido = dif > 0 ? "↻ Horario" : "↺ Antihorario";
         const vueltasTexto = Math.abs(vueltas) + " vuelta" + (Math.abs(vueltas) === 1 ? "" : "s");
-        sentidoEl.textContent = flecha + "  ·  " + vueltasTexto;
+        sentidoEl.textContent = textoSentido + "  ·  " + vueltasTexto;
       }
       anguloPrevio = angulo;
 

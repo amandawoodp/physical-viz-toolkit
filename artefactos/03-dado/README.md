@@ -11,7 +11,7 @@ El usuario lanza un Cubo ArUco bajo la cámara cenital. El teléfono identifica 
 
 ## Cómo usar
 
-1. Abre [la demo en vivo](https://amandawoodp.github.io/physical-viz-toolkit/artefactos/03-dado/) en el computador.
+1. Abre la demo en vivo en el computador.
 2. Click en "+ Conectar teléfono". Aparece un código QR.
 3. Escanea el QR con el iPhone/Android. Acepta el permiso de cámara.
 4. Coloca el teléfono en la Base A2 (soporte cenital con 4 botellas), con la cámara apuntando perpendicularmente hacia abajo.
@@ -19,23 +19,30 @@ El usuario lanza un Cubo ArUco bajo la cámara cenital. El teléfono identifica 
 6. La pantalla del computador muestra un número del 1 al 6, con un color asociado a esa cara.
 7. Cambia la cara visible: el número y el color cambian con un pequeño "pop" visual.
 
-## Componente Protobject
+## Sensor Protobject utilizado
 
-`Protobject.Aruco` — detecta marcadores ArUco con la cámara trasera del teléfono. El código toma siempre el marcador más grande visible (la cara superior del cubo) y mapea su ID a un número de cara del 1 al 6.
+`Protobject.Aruco` — detecta marcadores ArUco con la cámara trasera del teléfono y entrega un objeto con todos los marcadores visibles (`{ id: { position, size }, ... }`). El código toma siempre el marcador de mayor tamaño (la cara superior del cubo, más cercana a la cámara) y mapea su ID a un número de cara del 1 al 6 mediante el objeto `carasPorId`.
 
-## Sensor y mapeo de datos
+ID del marcador detectado → número de cara del dado (1–6) → número grande y color en pantalla del PC. El código aplica una **histéresis temporal** (`ESTABLE_MS`): solo confirma una cara cuando se mantiene estable durante ese tiempo, para que un lanzamiento (donde el cubo rueda y la cámara ve brevemente varias caras) no haga parpadear el número en el PC. Lo que se envía es un evento semántico ("la cara X quedó arriba"), nunca el flujo crudo de detecciones.
 
-ID del marcador ArUco detectado → número de cara del dado (1–6) → número grande y color en pantalla del PC.
+## Cómo adaptarlo a otros usos
 
-El código aplica una **histéresis temporal de 400 ms**: solo confirma una cara cuando se mantiene estable durante ese tiempo. Esto evita que durante un lanzamiento (cuando el cubo rueda y la cámara ve brevemente varias caras) el PC parpadee entre números. Lo que se envía al PC es un evento semántico ("la cara X quedó arriba"), no el flujo crudo de detecciones.
+El patrón "objeto con caras identificables, se confirma la que queda visible/arriba" sirve para cualquier selector discreto de pocas categorías:
 
-## Usos típicos
+- **Selector de escenario o modo de vista**: en vez de números 1–6, asocia cada cara a una vista distinta de una visualización (gráfico de barras, mapa, línea de tiempo).
+- **Decisión interactiva en un museo o feria**: "¿qué historia quieres ver?" — cada cara dispara un video, audio o animación distinta.
+- **Selector aleatorio para explorar datos**: usa el número de cara para saltar a un registro aleatorio de un dataset, útil para "muéstrame un ejemplo cualquiera".
+- **Dado con más o menos caras**: si usas una figura con otra cantidad de caras (tetraedro, icosaedro), solo hay que ajustar `carasPorId` con los IDs reales y el rango de colores en `coloresPorCara`.
 
-- Selector discreto de categorías (6 opciones)
-- Modo "aleatorio" para explorar datos
-- Decisión interactiva en un museo: "¿qué historia quieres ver?"
+Lo que cambia en cada caso es solo qué representa cada número en `index.html`; la detección, el mapeo ID→cara y la histéresis en `sensor.html` se mantienen igual.
 
-## Notas
+## Parámetros ajustables
+
+- **`ESTABLE_MS`** (`sensor.html`, default 400): milisegundos que una cara debe mantenerse como la más grande/visible antes de confirmarla y enviarla al PC. Súbelo si el número sigue parpadeando durante el lanzamiento; bájalo para una respuesta más inmediata.
+- **`carasPorId`** (`sensor.html`): mapeo de ID de marcador ArUco → número de cara (1–6). Ajústalo si tu cubo usa otros IDs (mira la consola del teléfono con cada cara hacia arriba para descubrirlos).
+- **`coloresPorCara`** (`index.html`): color asociado a cada número de cara. Puramente estético, cámbialo libremente.
+
+## Notas técnicas
 
 - No requiere calibración.
 - Si el cubo usa IDs distintos a 0–5, ajusta el mapeo en el objeto `carasPorId` dentro de `sensor.html`. Para descubrir los IDs reales, pon cada cara hacia arriba y mira lo que dice el teléfono.
